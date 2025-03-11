@@ -1,6 +1,5 @@
-[package]
-name = "chip8emu"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
+[workspace]
+members = [
+    "chip8_core",
+    "desktop"
+]
