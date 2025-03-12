@@ -81,13 +81,12 @@ impl Emulator {
         // Get opcode as u16
         let low_byte = self.ram[self.pc] as u16;
         let high_byte = self.ram[self.pc + 1] as u16;
-        let op_code = low_byte << 8 | high_byte;
+        let op_code = (low_byte << 8) | high_byte;
         self.pc += 2;
 
         match op_code & 0xF000 {
             0x1000 => {
-                let address = (op_code & 0x0FFF) as usize;
-                self.jump(address);
+                self.jump(op_code);
             }
         }
 
@@ -96,7 +95,7 @@ impl Emulator {
 
     // INSTRUCTION FUNCTIONS
 
-    fn jump(&mut self, address: usize) {
+    fn jump(&mut self, op_code: u16) {
         todo!()
     }
 }
