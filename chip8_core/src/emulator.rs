@@ -1,3 +1,5 @@
+use crate::errors::*;
+
 pub const RAM_SIZE: usize = 4096;
 pub const NUM_REGS: usize = 16;
 pub const STACK_SIZE: usize = 16;
@@ -55,8 +57,7 @@ impl Emulator {
 
         // Copying font set into ram from address 0x50 (80)
         // Get target location in RAM as slice and copy font set to it
-        emulator.ram[FONTSET_ADDR..(FONTSET_ADDR + FONTSET_SIZE)]
-            .copy_from_slice(&FONTSET);
+        emulator.ram[FONTSET_ADDR..(FONTSET_ADDR + FONTSET_SIZE)].copy_from_slice(&FONTSET);
 
         emulator
     }
@@ -75,7 +76,7 @@ impl Emulator {
         self.ram[START_ADDR..].copy_from_slice(rom);
     }
 
-    fn cycle(&mut self) -> bool {
+    fn cycle(&mut self) -> Result<bool> {
         // Returns bool draw flag
 
         // Get opcode as u16
@@ -85,9 +86,13 @@ impl Emulator {
         self.pc += 2;
 
         match op_code & 0xF000 {
-            0x1000 => {
-                self.jump(op_code);
+            0x0000 => match op_code {
+                0x00E0 => self.clear_screen(),
             }
+
+            0x1000 => self.jump(op_code),
+
+            _ => {}
         }
 
         todo!()
@@ -95,7 +100,12 @@ impl Emulator {
 
     // INSTRUCTION FUNCTIONS
 
-    fn jump(&mut self, op_code: u16) {
+    fn clear_screen(&mut self) {
         todo!()
+    }
+
+    fn jump(&mut self, op_code: u16) {
+        let address = (op_code & 0x0FFF) as usize;
+        self.pc = address;
     }
 }

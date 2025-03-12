@@ -3,3 +3,5 @@
 
 pub mod emulator;
 pub mod errors;
+
+pub use crate::errors::*;
