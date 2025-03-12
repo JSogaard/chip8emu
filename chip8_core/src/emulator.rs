@@ -39,6 +39,7 @@ pub struct Emulator {
     stack: [u16; STACK_SIZE],
     st: u8,
     dt: u8,
+    redraw_flag: bool,
 }
 
 impl Emulator {
@@ -53,6 +54,7 @@ impl Emulator {
             stack: [0; STACK_SIZE],
             st: 0,
             dt: 0,
+            redraw_flag: false,
         };
 
         // Copying font set into ram from address 0x50 (80)
