@@ -3,13 +3,13 @@ use crate::errors::*;
 pub const RAM_SIZE: usize = 4096;
 pub const NUM_REGS: usize = 16;
 pub const STACK_SIZE: usize = 16;
-pub const START_ADDR: usize = 0x200;
+pub const START_ADDR: u16 = 0x200;
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
 pub const FONTSET_SIZE: usize = 16 * 5;
-pub const FONTSET_ADDR: usize = 0x050;
+pub const FONTSET_ADDR: u16 = 0x050;
 pub const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -30,12 +30,12 @@ pub const FONTSET: [u8; FONTSET_SIZE] = [
 ];
 
 pub struct Emulator {
-    pc: usize,
+    pc: u16,
     ram: [u8; RAM_SIZE],
     screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
     v_reg: [u8; NUM_REGS],
     i_reg: u16,
-    sp: usize,
+    sp: u16,
     stack: [u16; STACK_SIZE],
     st: u8,
     dt: u8,
@@ -57,40 +57,46 @@ impl Emulator {
 
         // Copying font set into ram from address 0x50 (80)
         // Get target location in RAM as slice and copy font set to it
-        emulator.ram[FONTSET_ADDR..(FONTSET_ADDR + FONTSET_SIZE)].copy_from_slice(&FONTSET);
+        emulator.ram[FONTSET_ADDR as usize..(FONTSET_ADDR as usize + FONTSET_SIZE)]
+            .copy_from_slice(&FONTSET);
 
         emulator
     }
 
-    fn push(&mut self, val: u16) {
-        self.stack[self.sp] = val;
-        self.sp += 1;
+    pub fn load_rom(&mut self, rom: &[u8]) {
+        self.ram[START_ADDR as usize..].copy_from_slice(rom);
     }
 
-    fn pop(&mut self) -> u16 {
-        self.sp -= 1;
-        self.stack[self.sp]
-    }
-
-    fn load_rom(&mut self, rom: &[u8]) {
-        self.ram[START_ADDR..].copy_from_slice(rom);
-    }
-
-    fn cycle(&mut self) -> Result<bool> {
+    pub fn cycle(&mut self) -> Result<bool> {
         // Returns bool draw flag
 
         // Get opcode as u16
-        let low_byte = self.ram[self.pc] as u16;
-        let high_byte = self.ram[self.pc + 1] as u16;
+        let low_byte = self.ram[self.pc as usize] as u16;
+        let high_byte = self.ram[(self.pc + 1) as usize] as u16;
         let op_code = (low_byte << 8) | high_byte;
         self.pc += 2;
 
+        // Filter op code to match only the first half byte
         match op_code & 0xF000 {
             0x0000 => match op_code {
                 0x00E0 => self.clear_screen(),
-            }
+                0x00EE => self.return_subroutine(),
+
+                // If op code is 0x0NNN - call machine code subroutine,
+                // which isn't implemented.
+                _ => {
+                    return Err(Error::InvalidOpcodeError(
+                        "Call machine code routine".into(),
+                    ))
+                }
+            },
 
             0x1000 => self.jump(op_code),
+            0x2000 => self.call_subroutine(op_code),
+            0x3000 => self.skip_equal(op_code),
+            0x4000 => self.skip_not_equal(op_code),
+            0x5000 => self.skip_register_equal(op_code),
+            0x6000 => self.set_register_to_number(op_code),
 
             _ => {}
         }
@@ -98,14 +104,67 @@ impl Emulator {
         todo!()
     }
 
+    fn push(&mut self, val: u16) {
+        self.stack[self.sp as usize] = val;
+        self.sp += 1;
+    }
+
+    fn pop(&mut self) -> u16 {
+        self.sp -= 1;
+        self.stack[self.sp as usize]
+    }
+
     // INSTRUCTION FUNCTIONS
 
     fn clear_screen(&mut self) {
-        todo!()
+        self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+    }
+
+    fn return_subroutine(&mut self) {
+        // Pop return address from stack and set PC to it
+        let return_address = self.pop();
+        self.pc = return_address;
     }
 
     fn jump(&mut self, op_code: u16) {
-        let address = (op_code & 0x0FFF) as usize;
+        let address = (op_code & 0x0FFF);
         self.pc = address;
+    }
+
+    fn call_subroutine(&mut self, op_code: u16) {
+        // PC is pushed to stack to remember where to return after subroutine
+        self.push(self.pc);
+        let address = op_code & 0x0FFF;
+        self.pc = address;
+    }
+
+    fn skip_equal(&mut self, op_code: u16) {
+        let register = (op_code & 0x0F00 >> 8) as usize;
+        let number = (op_code & 0x00FF) as u8;
+        if number == self.v_reg[register] {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_not_equal(&mut self, op_code: u16) {
+        let register = (op_code & 0x0F00 >> 8) as usize;
+        let number = (op_code & 0x00FF) as u8;
+        if number != self.v_reg[register] {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_register_equal(&mut self, op_code: u16) {
+        let register_x = (op_code & 0x0F00 >> 8) as usize;
+        let register_y = (op_code & 0x00F0 >> 4) as usize;
+        if self.v_reg[register_x] == self.v_reg[register_y] {
+            self.pc += 2;
+        }
+    }
+
+    fn set_register_to_number(&mut self, op_code: u16) {
+        let register = (op_code & 0x0F00 >> 8) as usize;
+        let number = (op_code & 0x00FF) as u8;
+        self.v_reg[register] = number;
     }
 }
