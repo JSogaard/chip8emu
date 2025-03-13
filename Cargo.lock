@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "desktop"
+name = "cli"
 version = "0.1.0"
 dependencies = [
  "chip8_core",
