@@ -1,10 +1,11 @@
 use crate::errors::Error::*;
-use crate::errors::*;
+use crate::errors::Result;
 
 pub const RAM_SIZE: usize = 4096;
 pub const NUM_REGS: usize = 16;
 pub const STACK_SIZE: usize = 16;
 pub const START_ADDR: u16 = 0x200;
+pub const MAX_ROM_SIZE: usize = RAM_SIZE - START_ADDR as usize;
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
@@ -72,18 +73,28 @@ impl Emulator {
         emulator
     }
 
-    pub fn reset(&mut self) {
-        self.pc = 0;
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        if rom.len() <= MAX_ROM_SIZE {
+            self.ram[START_ADDR as usize..].copy_from_slice(rom);
+        } else {
+            return Err(InvalidRomSizeError);
+        }
 
+        Ok(())
     }
 
-    pub fn load_rom(&mut self, rom: &[u8]) {
-        self.ram[START_ADDR as usize..].copy_from_slice(rom);
+    pub fn redraw_flag(&self) -> bool {
+        self.redraw_flag
+    }
+
+    pub fn reset(&mut self) {
+        self.pc = 0;
     }
 
     pub fn cycle(&mut self) -> Result<bool> {
         // Returns bool draw flag
 
+        self.redraw_flag = false;
         // Get opcode as u16
         let low_byte = self.ram[self.pc as usize] as u16;
         let high_byte = self.ram[(self.pc + 1) as usize] as u16;
@@ -106,7 +117,7 @@ impl Emulator {
             },
 
             0x1000 => self.jump(opcode),
-            0x2000 => self.call_subroutine(opcode),
+            0x2000 => self.call_subroutine(opcode)?,
             0x3000 => self.skip_equal(opcode),
             0x4000 => self.skip_not_equal(opcode),
             0x5000 => self.skip_register_equal(opcode),
@@ -115,21 +126,34 @@ impl Emulator {
 
             // Register loading op codes
             0x8000 => match opcode & 0x000F {
-                0x0 => self.load_register(opcode),
-                0x1 => self.load_register_or(opcode),
-                0x2 => self.load_register_and(opcode),
+                0x0 => self.load_register_op(opcode, |_, vy| vy),
+                0x1 => self.load_register_op(opcode, |vx, vy| vx | vy),
+                0x2 => self.load_register_op(opcode, |vx, vy| vx & vy),
+                0x3 => self.load_register_op(opcode, |vx, vy| vx ^ vy),
                 _ => {}
             },
 
-            _ => {}
+            _ => {
+                return Err(InvalidOpcodeError(format!(
+                    "{:#X} - Unknown opcode",
+                    opcode
+                )))
+            }
         }
 
         todo!()
     }
 
-    fn push(&mut self, val: u16) {
+    fn push(&mut self, val: u16) -> Result<()> {
+        // Check for stack overflow
+        if self.sp >= STACK_SIZE as u16 {
+            return Err(StackOverflowError);
+        }
+
         self.stack[self.sp as usize] = val;
         self.sp += 1;
+
+        Ok(())
     }
 
     fn pop(&mut self) -> u16 {
@@ -145,6 +169,7 @@ impl Emulator {
     /// Clear screen
     fn clear_screen(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+        self.redraw_flag = true;
     }
 
     /// Opcode 00EE
@@ -164,17 +189,19 @@ impl Emulator {
 
     /// Opcode 2NNN
     /// Call subroutine at address NNN
-    fn call_subroutine(&mut self, opcode: u16) {
+    fn call_subroutine(&mut self, opcode: u16) -> Result<()> {
         // PC is pushed to stack to remember where to return after subroutine
-        self.push(self.pc);
+        self.push(self.pc)?;
         let address = opcode & 0x0FFF;
         self.pc = address;
+
+        Ok(())
     }
 
     /// Opcode 3XNN
     /// Skip next instruction if VX == NN
     fn skip_equal(&mut self, opcode: u16) {
-        let register = (opcode & 0x0F00 >> 8) as usize;
+        let register = ((opcode & 0x0F00) >> 8) as usize;
         let number = (opcode & 0x00FF) as u8;
         if number == self.v_reg[register] {
             self.pc += 2;
@@ -184,7 +211,7 @@ impl Emulator {
     /// Opcode 4XNN
     /// Skip next instruction if VX != NN
     fn skip_not_equal(&mut self, opcode: u16) {
-        let register = (opcode & 0x0F00 >> 8) as usize;
+        let register = ((opcode & 0x0F00) >> 8) as usize;
         let number = (opcode & 0x00FF) as u8;
         if number != self.v_reg[register] {
             self.pc += 2;
@@ -194,8 +221,8 @@ impl Emulator {
     /// Opcode 5XY0
     /// Skip next instruction if VX == VY
     fn skip_register_equal(&mut self, opcode: u16) {
-        let register_x = (opcode & 0x0F00 >> 8) as usize;
-        let register_y = (opcode & 0x00F0 >> 4) as usize;
+        let register_x = ((opcode & 0x0F00) >> 8) as usize;
+        let register_y = ((opcode & 0x00F0) >> 4) as usize;
         if self.v_reg[register_x] == self.v_reg[register_y] {
             self.pc += 2;
         }
@@ -204,7 +231,7 @@ impl Emulator {
     /// Opcode 6XNN
     /// Load NN into VX
     fn load_number(&mut self, opcode: u16) {
-        let register = (opcode & 0x0F00 >> 8) as usize;
+        let register = ((opcode & 0x0F00) >> 8) as usize;
         let number = (opcode & 0x00FF) as u8;
         self.v_reg[register] = number;
     }
@@ -212,43 +239,33 @@ impl Emulator {
     /// Opcode 7XNN
     /// Add NN to VX (VX += NN)
     fn add_number(&mut self, opcode: u16) {
-        let register = (opcode & 0x0F00 >> 8) as usize;
+        let register = ((opcode & 0x0F00) >> 8) as usize;
         let number = (opcode & 0x00FF) as u8;
         self.v_reg[register] += number;
     }
 
-    /// Opcode 8XY0
-    /// Load value at VY into VX (VX = VY)
-    fn load_register(&mut self, opcode: u16) {
-        let register_x = (opcode & 0x0F00 >> 8) as usize;
-        let register_y = (opcode & 0x00F0 >> 4) as usize;
-        self.v_reg[register_x] = self.v_reg[register_y];
-    }
-
-    /// Opcode 8XY1
-    /// Load value of bitwise VX OR VY into VX (VX = VX OR VY)
-    fn load_register_or(&mut self, opcode: u16) {
-        let register_x = (opcode & 0x0F00 >> 8) as usize;
-        let register_y = (opcode & 0x00F0 >> 4) as usize;
-        let value = self.v_reg[register_x] | self.v_reg[register_y];
+    /// Opcode 8XY1 to 8XY3
+    /// Load op(VX, VY) into VX
+    fn load_register_op<F: Fn(u8, u8) -> u8>(&mut self, opcode: u16, op: F) {
+        let register_x = ((opcode & 0x0F00) >> 8) as usize;
+        let register_y = ((opcode & 0x00F0) >> 4) as usize;
+        let value = op(self.v_reg[register_x], self.v_reg[register_y]);
         self.v_reg[register_x] = value;
     }
 
-    /// Opcode 8XY2
-    /// Load value of bitwise VX AND VY into VX (VX = VX AND VY)
-    fn load_register_and(&mut self, opcode: u16) {
-        let register_x = (opcode & 0x0F00 >> 8) as usize;
-        let register_y = (opcode & 0x00F0 >> 4) as usize;
-        let value = self.v_reg[register_x] & self.v_reg[register_y];
-        self.v_reg[register_x] = value;
-    }
+    /// Opcode 8XY4
+    /// Add value of VY to VX (VX += VY) and enable VF if overflow
+    fn add_register_carry(&mut self, opcode: u16) {
+        let register_x = ((opcode & 0x0F00) >> 8) as usize;
+        let register_y = ((opcode & 0x00F0) >> 4) as usize;
+        let result = self.v_reg[register_x] as u16 + self.v_reg[register_y] as u16;
+        self.v_reg[register_x] = result as u8;
 
-    /// Opcode 8XY3
-    /// Load value of bitwise VX XOR VY into VX (VX = VX XOR VY)
-    fn load_register_xor(&mut self, opcode: u16) {
-        let register_x = (opcode & 0x0F00 >> 8) as usize;
-        let register_y = (opcode & 0x00F0 >> 4) as usize;
-        let value = self.v_reg[register_x] ^ self.v_reg[register_y];
-        self.v_reg[register_x] = value;
+        // Enable carry register if addition overflows
+        if result > 255 {
+            self.v_reg[NUM_REGS - 1] = 1;
+        } else {
+            self.v_reg[NUM_REGS - 1] = 0
+        }
     }
 }
