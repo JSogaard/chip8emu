@@ -116,7 +116,10 @@ impl Emulator {
         self.stack[self.sp as usize]
     }
 
-    // INSTRUCTION FUNCTIONS
+    //************************************************************//
+    //                      OPCODE METHODS                        //
+    //************************************************************//
+
 
     fn clear_screen(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
@@ -129,7 +132,7 @@ impl Emulator {
     }
 
     fn jump(&mut self, op_code: u16) {
-        let address = (op_code & 0x0FFF);
+        let address = op_code & 0x0FFF;
         self.pc = address;
     }
 
