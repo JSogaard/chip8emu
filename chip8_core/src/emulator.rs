@@ -1,3 +1,4 @@
+use crate::errors::Error::*;
 use crate::errors::*;
 
 pub const RAM_SIZE: usize = 4096;
@@ -30,14 +31,20 @@ pub const FONTSET: [u8; FONTSET_SIZE] = [
 ];
 
 pub struct Emulator {
+    // Program counter
     pc: u16,
     ram: [u8; RAM_SIZE],
     screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
+    // General purpose registers
     v_reg: [u8; NUM_REGS],
+    // Index register
     i_reg: u16,
+    // Stack pointer
     sp: u16,
     stack: [u16; STACK_SIZE],
+    // Sound timer
     st: u8,
+    // Delay timer
     dt: u8,
     redraw_flag: bool,
 }
@@ -65,6 +72,11 @@ impl Emulator {
         emulator
     }
 
+    pub fn reset(&mut self) {
+        self.pc = 0;
+
+    }
+
     pub fn load_rom(&mut self, rom: &[u8]) {
         self.ram[START_ADDR as usize..].copy_from_slice(rom);
     }
@@ -75,30 +87,39 @@ impl Emulator {
         // Get opcode as u16
         let low_byte = self.ram[self.pc as usize] as u16;
         let high_byte = self.ram[(self.pc + 1) as usize] as u16;
-        let op_code = (low_byte << 8) | high_byte;
+        let opcode = (low_byte << 8) | high_byte;
         self.pc += 2;
 
+        // DECODE AND EXECUTE OPCODE
         // Filter op code to match only the first half byte
-        match op_code & 0xF000 {
-            0x0000 => match op_code {
+        match opcode & 0xF000 {
+            0x0000 => match opcode {
                 0x00E0 => self.clear_screen(),
                 0x00EE => self.return_subroutine(),
-
-                // If op code is 0x0NNN - call machine code subroutine,
+                // If op code is 0NNN - call machine code subroutine,
                 // which isn't implemented.
                 _ => {
-                    return Err(Error::InvalidOpcodeError(
-                        "Call machine code routine".into(),
+                    return Err(InvalidOpcodeError(
+                        "0NNN - Call machine code routine".into(),
                     ))
                 }
             },
 
-            0x1000 => self.jump(op_code),
-            0x2000 => self.call_subroutine(op_code),
-            0x3000 => self.skip_equal(op_code),
-            0x4000 => self.skip_not_equal(op_code),
-            0x5000 => self.skip_register_equal(op_code),
-            0x6000 => self.set_register_to_number(op_code),
+            0x1000 => self.jump(opcode),
+            0x2000 => self.call_subroutine(opcode),
+            0x3000 => self.skip_equal(opcode),
+            0x4000 => self.skip_not_equal(opcode),
+            0x5000 => self.skip_register_equal(opcode),
+            0x6000 => self.load_number(opcode),
+            0x7000 => self.add_number(opcode),
+
+            // Register loading op codes
+            0x8000 => match opcode & 0x000F {
+                0x0 => self.load_register(opcode),
+                0x1 => self.load_register_or(opcode),
+                0x2 => self.load_register_and(opcode),
+                _ => {}
+            },
 
             _ => {}
         }
@@ -120,56 +141,114 @@ impl Emulator {
     //                      OPCODE METHODS                        //
     //************************************************************//
 
-
+    /// Opcode 00E0
+    /// Clear screen
     fn clear_screen(&mut self) {
         self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 
+    /// Opcode 00EE
+    /// Return from subroutine
     fn return_subroutine(&mut self) {
         // Pop return address from stack and set PC to it
         let return_address = self.pop();
         self.pc = return_address;
     }
 
-    fn jump(&mut self, op_code: u16) {
-        let address = op_code & 0x0FFF;
+    /// Opcode 1NNN
+    /// Jump to address NNN
+    fn jump(&mut self, opcode: u16) {
+        let address = opcode & 0x0FFF;
         self.pc = address;
     }
 
-    fn call_subroutine(&mut self, op_code: u16) {
+    /// Opcode 2NNN
+    /// Call subroutine at address NNN
+    fn call_subroutine(&mut self, opcode: u16) {
         // PC is pushed to stack to remember where to return after subroutine
         self.push(self.pc);
-        let address = op_code & 0x0FFF;
+        let address = opcode & 0x0FFF;
         self.pc = address;
     }
 
-    fn skip_equal(&mut self, op_code: u16) {
-        let register = (op_code & 0x0F00 >> 8) as usize;
-        let number = (op_code & 0x00FF) as u8;
+    /// Opcode 3XNN
+    /// Skip next instruction if VX == NN
+    fn skip_equal(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00 >> 8) as usize;
+        let number = (opcode & 0x00FF) as u8;
         if number == self.v_reg[register] {
             self.pc += 2;
         }
     }
 
-    fn skip_not_equal(&mut self, op_code: u16) {
-        let register = (op_code & 0x0F00 >> 8) as usize;
-        let number = (op_code & 0x00FF) as u8;
+    /// Opcode 4XNN
+    /// Skip next instruction if VX != NN
+    fn skip_not_equal(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00 >> 8) as usize;
+        let number = (opcode & 0x00FF) as u8;
         if number != self.v_reg[register] {
             self.pc += 2;
         }
     }
 
-    fn skip_register_equal(&mut self, op_code: u16) {
-        let register_x = (op_code & 0x0F00 >> 8) as usize;
-        let register_y = (op_code & 0x00F0 >> 4) as usize;
+    /// Opcode 5XY0
+    /// Skip next instruction if VX == VY
+    fn skip_register_equal(&mut self, opcode: u16) {
+        let register_x = (opcode & 0x0F00 >> 8) as usize;
+        let register_y = (opcode & 0x00F0 >> 4) as usize;
         if self.v_reg[register_x] == self.v_reg[register_y] {
             self.pc += 2;
         }
     }
 
-    fn set_register_to_number(&mut self, op_code: u16) {
-        let register = (op_code & 0x0F00 >> 8) as usize;
-        let number = (op_code & 0x00FF) as u8;
+    /// Opcode 6XNN
+    /// Load NN into VX
+    fn load_number(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00 >> 8) as usize;
+        let number = (opcode & 0x00FF) as u8;
         self.v_reg[register] = number;
+    }
+
+    /// Opcode 7XNN
+    /// Add NN to VX (VX += NN)
+    fn add_number(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00 >> 8) as usize;
+        let number = (opcode & 0x00FF) as u8;
+        self.v_reg[register] += number;
+    }
+
+    /// Opcode 8XY0
+    /// Load value at VY into VX (VX = VY)
+    fn load_register(&mut self, opcode: u16) {
+        let register_x = (opcode & 0x0F00 >> 8) as usize;
+        let register_y = (opcode & 0x00F0 >> 4) as usize;
+        self.v_reg[register_x] = self.v_reg[register_y];
+    }
+
+    /// Opcode 8XY1
+    /// Load value of bitwise VX OR VY into VX (VX = VX OR VY)
+    fn load_register_or(&mut self, opcode: u16) {
+        let register_x = (opcode & 0x0F00 >> 8) as usize;
+        let register_y = (opcode & 0x00F0 >> 4) as usize;
+        let value = self.v_reg[register_x] | self.v_reg[register_y];
+        self.v_reg[register_x] = value;
+    }
+
+    /// Opcode 8XY2
+    /// Load value of bitwise VX AND VY into VX (VX = VX AND VY)
+    fn load_register_and(&mut self, opcode: u16) {
+        let register_x = (opcode & 0x0F00 >> 8) as usize;
+        let register_y = (opcode & 0x00F0 >> 4) as usize;
+        let value = self.v_reg[register_x] & self.v_reg[register_y];
+        self.v_reg[register_x] = value;
+    }
+
+    /// Opcode 8XY3
+    /// Load value of bitwise VX XOR VY into VX (VX = VX XOR VY)
+    fn load_register_xor(&mut self, opcode: u16) {
+        let register_x = (opcode & 0x0F00 >> 8) as usize;
+        let register_y = (opcode & 0x00F0 >> 4) as usize;
+        let value = self.v_reg[register_x] ^ self.v_reg[register_y];
+        self.v_reg[register_x] = value;
     }
 }
