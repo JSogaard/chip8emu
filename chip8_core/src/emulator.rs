@@ -3,6 +3,7 @@ use crate::errors::Result;
 
 pub const RAM_SIZE: usize = 4096;
 pub const NUM_REGS: usize = 16;
+pub const CARRY_REGISTER: usize = NUM_REGS - 1;
 pub const STACK_SIZE: usize = 16;
 pub const START_ADDR: u16 = 0x200;
 pub const MAX_ROM_SIZE: usize = RAM_SIZE - START_ADDR as usize;
@@ -216,9 +217,9 @@ impl Emulator {
     /// Opcode 5XY0
     /// Skip next instruction if VX == VY
     fn skip_register_equal(&mut self, opcode: u16) {
-        let register_x = ((opcode & 0x0F00) >> 8) as usize;
-        let register_y = ((opcode & 0x00F0) >> 4) as usize;
-        if self.v_reg[register_x] == self.v_reg[register_y] {
+        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        if self.v_reg[reg_x] == self.v_reg[reg_y] {
             self.pc += 2;
         }
     }
@@ -242,21 +243,50 @@ impl Emulator {
     /// Opcode 8XY1 to 8XY3
     /// Load op(VX, VY) into VX
     fn load_register_op<F: Fn(u8, u8) -> u8>(&mut self, opcode: u16, op: F) {
-        let register_x = ((opcode & 0x0F00) >> 8) as usize;
-        let register_y = ((opcode & 0x00F0) >> 4) as usize;
-        let value = op(self.v_reg[register_x], self.v_reg[register_y]);
-        self.v_reg[register_x] = value;
+        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        let value = op(self.v_reg[reg_x], self.v_reg[reg_y]);
+        self.v_reg[reg_x] = value;
     }
 
     /// Opcode 8XY4
-    /// Add value of VY to VX (VX += VY) and enable VF if overflow
+    /// Add value of VY to VX (VX += VY) and enable carry register if overflowing
     fn add_register_carry(&mut self, opcode: u16) {
-        let register_x = ((opcode & 0x0F00) >> 8) as usize;
-        let register_y = ((opcode & 0x00F0) >> 4) as usize;
-        let result = self.v_reg[register_x] as u16 + self.v_reg[register_y] as u16;
-        self.v_reg[register_x] = result as u8;
+        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        let result = self.v_reg[reg_x] as u16 + self.v_reg[reg_y] as u16;
+        self.v_reg[reg_x] = result as u8;
 
         // Enable carry register if addition overflows
-        self.v_reg[NUM_REGS - 1] = (result > 255) as u8;
+        self.v_reg[CARRY_REGISTER] = (result > 255) as u8;
+    }
+
+    /// Opcode 8XY5
+    /// Subtract value of VY from VX (VX -= VY) and enable carry register
+    /// if not borrowing
+    fn sub_register(&mut self, opcode: u16) {
+        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        let result = self.v_reg[reg_x] - self.v_reg[reg_y];
+        self.v_reg[reg_x] = result;
+
+        // Enable carry register if subtraction borrows
+        let not_borrow = (self.v_reg[reg_x] > self.v_reg[reg_y]) as u8;
+        self.v_reg[CARRY_REGISTER] = not_borrow;
+    }
+
+    /// Opcode 8XY6
+    /// Set carry register to least significant bit of VX
+    fn shift_right(&mut self, opcode: u16) {
+    let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+    self.v_reg[CARRY_REGISTER] = self.v_reg[reg_x] & 0x1;
+    self.v_reg[reg_x] >>= 1;
+    }
+
+    /// Opcode 8XY7
+    /// Subtract the value of VX from VY and load result into VX (VX = VY - VX)
+    /// then enable carry register if not borrowing
+    fn sub_register_reversed(&mut self, opcode: u16) {
+        
     }
 }
