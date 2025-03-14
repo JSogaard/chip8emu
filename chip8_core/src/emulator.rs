@@ -257,10 +257,6 @@ impl Emulator {
         self.v_reg[register_x] = result as u8;
 
         // Enable carry register if addition overflows
-        if result > 255 {
-            self.v_reg[NUM_REGS - 1] = 1;
-        } else {
-            self.v_reg[NUM_REGS - 1] = 0
-        }
+        self.v_reg[NUM_REGS - 1] = (result > 255) as u8;
     }
 }
