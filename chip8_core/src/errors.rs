@@ -5,9 +5,6 @@ pub enum Error {
     #[error("Program contained an invalid opcode:\n {0}")]
     InvalidOpcodeError(String),
 
-    #[error("Program contained an unknown opcode:\n {0:#X}")]
-    UnknownOpcodeError(u16),
-
     #[error("Invalid ROM size")]
     InvalidRomSizeError,
 

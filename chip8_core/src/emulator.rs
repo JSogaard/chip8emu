@@ -1,4 +1,4 @@
-use crate::errors::Error;
+use crate::errors::Error::*;
 use crate::errors::Result;
 
 pub const RAM_SIZE: usize = 4096;
@@ -77,7 +77,7 @@ impl Emulator {
         if rom.len() <= MAX_ROM_SIZE {
             self.ram[START_ADDR as usize..].copy_from_slice(rom);
         } else {
-            return Err(Error::InvalidRomSizeError);
+            return Err(InvalidRomSizeError);
         }
 
         Ok(())
@@ -103,35 +103,42 @@ impl Emulator {
 
         // DECODE AND EXECUTE OPCODE
         // Filter op code to match only the first half byte
-        match opcode {
+        match opcode & 0xF000 {
+            0x0000 => match opcode {
+                0x00E0 => self.clear_screen(),
+                0x00EE => self.return_subroutine(),
+                // If op code is 0NNN - call machine code subroutine,
+                // which isn't implemented.
+                _ => {
+                    return Err(InvalidOpcodeError(
+                        "0NNN - Call machine code routine".into(),
+                    ))
+                }
+            },
 
-            0x00E0 => self.clear_screen(),
-            0x00EE => self.return_subroutine(),
-            // If op code is 0NNN - call machine code subroutine,
-            // which isn't implemented.
-            0x0000..=0x0FFF => {
-                return Err(Error::InvalidOpcodeError(
-                    "0NNN - Call machine code routine".into(),
-                ))
-            }
-            0x1000..=0x1FFF => self.jump(opcode),
-            0x2000..=0x2FFF => self.call_subroutine(opcode)?,
-            0x3000..=0x3FFF => self.skip_equal(opcode),
-            0x4000..=0x4FFF => self.skip_not_equal(opcode),
-            0x5000..=0x5FFF => self.skip_register_equal(opcode),
-            0x6000..=0x6FFF => self.load_number(opcode),
-            0x7000..=0x7FFF => self.add_number(opcode),
+            0x1000 => self.jump(opcode),
+            0x2000 => self.call_subroutine(opcode)?,
+            0x3000 => self.skip_equal(opcode),
+            0x4000 => self.skip_not_equal(opcode),
+            0x5000 => self.skip_register_equal(opcode),
+            0x6000 => self.load_number(opcode),
+            0x7000 => self.add_number(opcode),
 
             // Register loading op codes
-            0x8000..=0x8FFF => match opcode & 0x000F {
+            0x8000 => match opcode & 0x000F {
                 0x0 => self.load_register_op(opcode, |_, vy| vy),
                 0x1 => self.load_register_op(opcode, |vx, vy| vx | vy),
                 0x2 => self.load_register_op(opcode, |vx, vy| vx & vy),
                 0x3 => self.load_register_op(opcode, |vx, vy| vx ^ vy),
-                _ => return Err(Error::UnknownOpcodeError(opcode))
+                _ => {}
             },
 
-            _ => return Err(Error::UnknownOpcodeError(opcode))
+            _ => {
+                return Err(InvalidOpcodeError(format!(
+                    "{:#X} - Unknown opcode",
+                    opcode
+                )))
+            }
         }
 
         todo!()
@@ -140,7 +147,7 @@ impl Emulator {
     fn push(&mut self, val: u16) -> Result<()> {
         // Check for stack overflow
         if self.sp >= STACK_SIZE as u16 {
-            return Err(Error::StackOverflowError);
+            return Err(StackOverflowError);
         }
 
         self.stack[self.sp as usize] = val;
