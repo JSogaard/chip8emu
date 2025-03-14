@@ -1,4 +1,4 @@
-use crate::errors::Error::*;
+use crate::errors::Error;
 use crate::errors::Result;
 
 pub const RAM_SIZE: usize = 4096;
@@ -77,7 +77,7 @@ impl Emulator {
         if rom.len() <= MAX_ROM_SIZE {
             self.ram[START_ADDR as usize..].copy_from_slice(rom);
         } else {
-            return Err(InvalidRomSizeError);
+            return Err(Error::InvalidRomSizeError);
         }
 
         Ok(())
@@ -110,7 +110,7 @@ impl Emulator {
                 // If op code is 0NNN - call machine code subroutine,
                 // which isn't implemented.
                 _ => {
-                    return Err(InvalidOpcodeError(
+                    return Err(Error::InvalidOpcodeError(
                         "0NNN - Call machine code routine".into(),
                     ))
                 }
@@ -130,15 +130,10 @@ impl Emulator {
                 0x1 => self.load_register_op(opcode, |vx, vy| vx | vy),
                 0x2 => self.load_register_op(opcode, |vx, vy| vx & vy),
                 0x3 => self.load_register_op(opcode, |vx, vy| vx ^ vy),
-                _ => {}
+                _ => return Err(Error::UnknownOpcodeError(opcode))
             },
 
-            _ => {
-                return Err(InvalidOpcodeError(format!(
-                    "{:#X} - Unknown opcode",
-                    opcode
-                )))
-            }
+            _ => return Err(Error::UnknownOpcodeError(opcode))
         }
 
         todo!()
@@ -147,7 +142,7 @@ impl Emulator {
     fn push(&mut self, val: u16) -> Result<()> {
         // Check for stack overflow
         if self.sp >= STACK_SIZE as u16 {
-            return Err(StackOverflowError);
+            return Err(Error::StackOverflowError);
         }
 
         self.stack[self.sp as usize] = val;
