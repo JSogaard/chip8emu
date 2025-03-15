@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::errors::Error;
 use crate::errors::Result;
 
@@ -49,6 +51,8 @@ pub struct Emulator {
     // Delay timer
     dt: u8,
     redraw_flag: bool,
+    rom_loaded: bool,
+    rng: rand::rngs::ThreadRng,
 }
 
 impl Emulator {
@@ -64,6 +68,8 @@ impl Emulator {
             st: 0,
             dt: 0,
             redraw_flag: false,
+            rom_loaded: false,
+            rng: rand::rng(),
         };
 
         // Copying font set into ram from address 0x50 (80)
@@ -106,8 +112,8 @@ impl Emulator {
 
         // Check if the end of RAM is reached
         if self.pc as usize >= RAM_SIZE {
-            return Err(Error::InvalidRamAddressError)
-        } 
+            return Err(Error::InvalidRamAddressError);
+        }
 
         self.redraw_flag = false;
         // Get opcode as u16
@@ -150,10 +156,15 @@ impl Emulator {
                 0x6 => self.shift_right(opcode),
                 0x7 => self.sub_register(opcode),
                 0xE => self.shift_left(opcode),
-                _ => return Err(Error::UnknownOpcodeError(opcode))
+                _ => return Err(Error::UnknownOpcodeError(opcode)),
             },
 
-            _ => return Err(Error::UnknownOpcodeError(opcode))
+            0x9000 => self.skip_register_not_equal(opcode),
+            0xA000 => self.load_i(opcode),
+            0xB000 => self.jump_plus(opcode),
+            0xC000 => self.random_and(opcode),
+
+            _ => return Err(Error::UnknownOpcodeError(opcode)),
         }
 
         todo!()
@@ -173,7 +184,7 @@ impl Emulator {
 
     fn pop(&mut self) -> Result<u16> {
         if self.sp == 0 {
-            return Err(Error::StackUnderflowError)
+            return Err(Error::StackUnderflowError);
         }
 
         self.sp -= 1;
@@ -197,15 +208,14 @@ impl Emulator {
         // Pop return address from stack and set PC to it
         let return_address = self.pop()?;
         self.pc = return_address;
-        
+
         Ok(())
     }
 
     /// Opcode 1NNN
     /// Jump to address NNN
     fn jump(&mut self, opcode: u16) {
-        let address = opcode & 0x0FFF;
-        self.pc = address;
+        self.pc = opcode & 0x0FFF;
     }
 
     /// Opcode 2NNN
@@ -293,7 +303,6 @@ impl Emulator {
         let not_borrow = (self.v_reg[reg_x] > self.v_reg[reg_y]) as u8;
         self.v_reg[CARRY_REGISTER] = not_borrow;
 
-            
         let result = self.v_reg[reg_x].wrapping_sub(self.v_reg[reg_y]);
         self.v_reg[reg_x] = result;
     }
@@ -302,9 +311,9 @@ impl Emulator {
     /// Set carry register to least significant bit of VX
     /// and shift VX one bit right
     fn shift_right(&mut self, opcode: u16) {
-    let register = ((opcode & 0x0F00) >> 8) as usize;
-    self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
-    self.v_reg[register] >>= 1;
+        let register = ((opcode & 0x0F00) >> 8) as usize;
+        self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
+        self.v_reg[register] >>= 1;
     }
 
     /// Opcode 8XY7
@@ -338,10 +347,30 @@ impl Emulator {
             self.pc += 2;
         }
     }
+
+    /// Opcode ANNN
+    /// Set I register to NNN
+    fn load_i(&mut self, opcode: u16) {
+        self.i_reg = opcode & 0x0FFF;
+    }
+
+    /// Opcode BNNN
+    /// Jump to address at V0 + NNN
+    fn jump_plus(&mut self, opcode: u16) {
+        self.pc = self.v_reg[0] as u16 + (opcode & 0x0FFF);
+    }
+
+    /// Opcode CXNN
+    /// Generate random number, R, from 0 to 255 and add R AND NN to VX
+    fn random_and(&mut self, opcode: u16) {
+        let register = ((opcode & 0x0F00) >> 8) as usize;
+        let number = (opcode & 0x00FF) as u8;
+        let random: u8 = self.rng.random();
+        self.v_reg[register] = random & number;
+    }
 }
 
-
-// Helper functions
+// HELPER FUNCTIONS
 
 fn decode_middle_registers(opcode: u16) -> (usize, usize) {
     let reg_x = ((opcode & 0x0F00) >> 8) as usize;
