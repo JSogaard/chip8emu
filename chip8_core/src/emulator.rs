@@ -148,6 +148,8 @@ impl Emulator {
                 0x4 => self.add_register_carry(opcode),
                 0x5 => self.sub_register(opcode),
                 0x6 => self.shift_right(opcode),
+                0x7 => self.sub_register(opcode),
+                0xE => self.shift_left(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode))
             },
 
@@ -298,6 +300,7 @@ impl Emulator {
 
     /// Opcode 8XY6
     /// Set carry register to least significant bit of VX
+    /// and shift VX one bit right
     fn shift_right(&mut self, opcode: u16) {
     let register = ((opcode & 0x0F00) >> 8) as usize;
     self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
@@ -316,10 +319,24 @@ impl Emulator {
 
         let result = self.v_reg[reg_y].wrapping_sub(self.v_reg[reg_x]);
         self.v_reg[reg_x] = result;
+    }
 
+    /// Opcode 8XYE
+    /// Set carry register to least significant bit of VX
+    /// and shift VX one bit left
+    fn shift_left(&mut self, opcode: u16) {
+        let register = ((opcode & 0x0F00) >> 8) as usize;
+        self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
+        self.v_reg[register] <<= 1;
+    }
 
-
-        todo!()
+    /// Opcode 9XY0
+    /// Skip next instruction if VX != VY
+    fn skip_register_not_equal(&mut self, opcode: u16) {
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+        if self.v_reg[reg_x] != self.v_reg[reg_y] {
+            self.pc += 2;
+        }
     }
 }
 
