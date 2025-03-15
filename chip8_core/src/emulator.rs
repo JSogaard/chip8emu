@@ -196,6 +196,7 @@ impl Emulator {
         Ok(self.stack[self.sp as usize])
     }
 
+
     //************************************************************//
     //                      OPCODE METHODS                        //
     //************************************************************//
@@ -373,12 +374,48 @@ impl Emulator {
         let random: u8 = self.rng.random();
         self.v_reg[register] = random & number;
     }
+
+    /// Opcode DXYN
+    /// Draws N-byte (heigh of N pixels) on screen and enables
+    /// carry register if there is collision
+    fn draw_sprite(&mut self, opcode: u16) {
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+        let rows = (opcode & 0x000F) as usize;
+        let sprite = self.i_reg;
+        // Set x and y coords to VX and VY with wrapping for the starting coord
+        let x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
+        let y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
+        self.v_reg[CARRY_REGISTER] = 0;
+
+        for i in 0..rows {
+            let sprite_byte = self.ram[self.i_reg as usize + i];
+
+            for j in 0..8 {
+                let sprite_pixel = pick_bit(sprite_byte, j);
+                // Index of pixel on screen
+                let pixel_index = x_coord + y_coord * SCREEN_WIDTH as u8;
+                
+                if self.screen[pixel_index] && sprite_pixel {}
+
+                todo!()
+            }
+        }
+    }
 }
 
-// HELPER FUNCTIONS
 
+//************************************************************//
+//                     HELPER FUNCTIONS                       //
+//************************************************************//
+
+/// Get the register numbers X and Y in an opcode: NXYN
 fn decode_middle_registers(opcode: u16) -> (usize, usize) {
     let reg_x = ((opcode & 0x0F00) >> 8) as usize;
     let reg_y = ((opcode & 0x00F0) >> 4) as usize;
     (reg_x, reg_y)
+}
+
+/// Get the nth bit in a byte
+fn pick_bit(byte: u8, n: u8) -> u8 {
+    (byte >> n) & 0x1
 }
