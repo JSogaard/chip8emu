@@ -13,6 +13,12 @@ pub enum Error {
 
     #[error("Stack overflow")]
     StackOverflowError,
+
+    #[error("Stack underflow")]
+    StackUnderflowError,
+
+    #[error("Reached invalid address in RAM")]
+    InvalidRamAddressError,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -89,17 +89,31 @@ impl Emulator {
     }
 
     pub fn reset(&mut self) {
-        self.pc = 0;
+        self.pc = START_ADDR;
+        self.ram = [0; RAM_SIZE];
+        self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+        self.v_reg = [0; NUM_REGS];
+        self.i_reg = 0;
+        self.sp = 0;
+        self.stack = [0; STACK_SIZE];
+        self.st = 0;
+        self.dt = 0;
+        self.redraw_flag = false;
     }
 
     pub fn cycle(&mut self) -> Result<bool> {
         // Returns bool draw flag
 
+        // Check if the end of RAM is reached
+        if self.pc as usize >= RAM_SIZE {
+            return Err(Error::InvalidRamAddressError)
+        } 
+
         self.redraw_flag = false;
         // Get opcode as u16
-        let low_byte = self.ram[self.pc as usize] as u16;
-        let high_byte = self.ram[(self.pc + 1) as usize] as u16;
-        let opcode = (low_byte << 8) | high_byte;
+        let high_byte = self.ram[self.pc as usize] as u16;
+        let low_byte = self.ram[(self.pc + 1) as usize] as u16;
+        let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
 
         // DECODE AND EXECUTE OPCODE
@@ -107,7 +121,7 @@ impl Emulator {
         match opcode & 0xF000 {
             0x0000 => match opcode {
                 0x00E0 => self.clear_screen(),
-                0x00EE => self.return_subroutine(),
+                0x00EE => self.return_subroutine()?,
                 // If op code is 0NNN - call machine code subroutine,
                 // which isn't implemented.
                 _ => {
@@ -131,6 +145,9 @@ impl Emulator {
                 0x1 => self.load_register_op(opcode, |vx, vy| vx | vy),
                 0x2 => self.load_register_op(opcode, |vx, vy| vx & vy),
                 0x3 => self.load_register_op(opcode, |vx, vy| vx ^ vy),
+                0x4 => self.add_register_carry(opcode),
+                0x5 => self.sub_register(opcode),
+                0x6 => self.shift_right(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode))
             },
 
@@ -152,9 +169,13 @@ impl Emulator {
         Ok(())
     }
 
-    fn pop(&mut self) -> u16 {
+    fn pop(&mut self) -> Result<u16> {
+        if self.sp == 0 {
+            return Err(Error::StackUnderflowError)
+        }
+
         self.sp -= 1;
-        self.stack[self.sp as usize]
+        Ok(self.stack[self.sp as usize])
     }
 
     //************************************************************//
@@ -170,10 +191,12 @@ impl Emulator {
 
     /// Opcode 00EE
     /// Return from subroutine
-    fn return_subroutine(&mut self) {
+    fn return_subroutine(&mut self) -> Result<()> {
         // Pop return address from stack and set PC to it
-        let return_address = self.pop();
+        let return_address = self.pop()?;
         self.pc = return_address;
+        
+        Ok(())
     }
 
     /// Opcode 1NNN
@@ -217,8 +240,7 @@ impl Emulator {
     /// Opcode 5XY0
     /// Skip next instruction if VX == VY
     fn skip_register_equal(&mut self, opcode: u16) {
-        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
         if self.v_reg[reg_x] == self.v_reg[reg_y] {
             self.pc += 2;
         }
@@ -237,14 +259,13 @@ impl Emulator {
     fn add_number(&mut self, opcode: u16) {
         let register = ((opcode & 0x0F00) >> 8) as usize;
         let number = (opcode & 0x00FF) as u8;
-        self.v_reg[register] += number;
+        self.v_reg[register] = self.v_reg[register].wrapping_add(number);
     }
 
     /// Opcode 8XY1 to 8XY3
     /// Load op(VX, VY) into VX
     fn load_register_op<F: Fn(u8, u8) -> u8>(&mut self, opcode: u16, op: F) {
-        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
         let value = op(self.v_reg[reg_x], self.v_reg[reg_y]);
         self.v_reg[reg_x] = value;
     }
@@ -252,41 +273,61 @@ impl Emulator {
     /// Opcode 8XY4
     /// Add value of VY to VX (VX += VY) and enable carry register if overflowing
     fn add_register_carry(&mut self, opcode: u16) {
-        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
-        let result = self.v_reg[reg_x] as u16 + self.v_reg[reg_y] as u16;
-        self.v_reg[reg_x] = result as u8;
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+        let result = self.v_reg[reg_x].wrapping_add(self.v_reg[reg_y]);
+        self.v_reg[reg_x] = result;
 
         // Enable carry register if addition overflows
-        self.v_reg[CARRY_REGISTER] = (result > 255) as u8;
+        self.v_reg[CARRY_REGISTER] = (result < self.v_reg[reg_x]) as u8;
     }
 
     /// Opcode 8XY5
     /// Subtract value of VY from VX (VX -= VY) and enable carry register
     /// if not borrowing
     fn sub_register(&mut self, opcode: u16) {
-        let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-        let reg_y = ((opcode & 0x00F0) >> 4) as usize;
-        let result = self.v_reg[reg_x] - self.v_reg[reg_y];
-        self.v_reg[reg_x] = result;
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
 
         // Enable carry register if subtraction borrows
         let not_borrow = (self.v_reg[reg_x] > self.v_reg[reg_y]) as u8;
         self.v_reg[CARRY_REGISTER] = not_borrow;
+
+            
+        let result = self.v_reg[reg_x].wrapping_sub(self.v_reg[reg_y]);
+        self.v_reg[reg_x] = result;
     }
 
     /// Opcode 8XY6
     /// Set carry register to least significant bit of VX
     fn shift_right(&mut self, opcode: u16) {
-    let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-    self.v_reg[CARRY_REGISTER] = self.v_reg[reg_x] & 0x1;
-    self.v_reg[reg_x] >>= 1;
+    let register = ((opcode & 0x0F00) >> 8) as usize;
+    self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
+    self.v_reg[register] >>= 1;
     }
 
     /// Opcode 8XY7
     /// Subtract the value of VX from VY and load result into VX (VX = VY - VX)
     /// then enable carry register if not borrowing
     fn sub_register_reversed(&mut self, opcode: u16) {
-        
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+
+        // Enable carry register if subtraction borrows
+        let not_borrow = (self.v_reg[reg_y] > self.v_reg[reg_x]) as u8;
+        self.v_reg[CARRY_REGISTER] = not_borrow;
+
+        let result = self.v_reg[reg_y].wrapping_sub(self.v_reg[reg_x]);
+        self.v_reg[reg_x] = result;
+
+
+
+        todo!()
     }
+}
+
+
+// Helper functions
+
+fn decode_middle_registers(opcode: u16) -> (usize, usize) {
+    let reg_x = ((opcode & 0x0F00) >> 8) as usize;
+    let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+    (reg_x, reg_y)
 }
