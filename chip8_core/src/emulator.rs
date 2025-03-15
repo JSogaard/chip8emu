@@ -86,6 +86,7 @@ impl Emulator {
         } else {
             return Err(Error::InvalidRomSizeError);
         }
+        self.rom_loaded = true;
 
         Ok(())
     }
@@ -105,11 +106,15 @@ impl Emulator {
         self.st = 0;
         self.dt = 0;
         self.redraw_flag = false;
+        self.rom_loaded = false;
     }
 
-    pub fn cycle(&mut self) -> Result<bool> {
-        // Returns bool draw flag
-
+    pub fn cycle(&mut self) -> Result<()> {
+        // Check if ROM as been loaded into RAM
+        if !self.rom_loaded {
+            return Err(Error::MissingRomError)
+        }
+        
         // Check if the end of RAM is reached
         if self.pc as usize >= RAM_SIZE {
             return Err(Error::InvalidRamAddressError);

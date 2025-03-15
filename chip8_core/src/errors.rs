@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("Reached invalid address in RAM")]
     InvalidRamAddressError,
+
+    #[error("No ROM as been loaded yet")]
+    MissingRomError
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
