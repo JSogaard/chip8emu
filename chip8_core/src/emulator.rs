@@ -112,9 +112,9 @@ impl Emulator {
     pub fn cycle(&mut self) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.rom_loaded {
-            return Err(Error::MissingRomError)
+            return Err(Error::MissingRomError);
         }
-        
+
         // Check if the end of RAM is reached
         if self.pc as usize >= RAM_SIZE {
             return Err(Error::InvalidRamAddressError);
@@ -175,6 +175,7 @@ impl Emulator {
         todo!()
     }
 
+    /// Push return address to stack
     fn push(&mut self, val: u16) -> Result<()> {
         // Check for stack overflow
         if self.sp >= STACK_SIZE as u16 {
@@ -187,6 +188,7 @@ impl Emulator {
         Ok(())
     }
 
+    /// Pop return address from stack
     fn pop(&mut self) -> Result<u16> {
         if self.sp == 0 {
             return Err(Error::StackUnderflowError);
@@ -195,7 +197,6 @@ impl Emulator {
         self.sp -= 1;
         Ok(self.stack[self.sp as usize])
     }
-
 
     //************************************************************//
     //                      OPCODE METHODS                        //
@@ -383,26 +384,41 @@ impl Emulator {
         let rows = (opcode & 0x000F) as usize;
         let sprite = self.i_reg;
         // Set x and y coords to VX and VY with wrapping for the starting coord
-        let x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
-        let y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
+        let mut x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
+        let mut y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
         self.v_reg[CARRY_REGISTER] = 0;
 
         for i in 0..rows {
             let sprite_byte = self.ram[self.i_reg as usize + i];
-
+            
+            if y_coord as usize >= SCREEN_HEIGHT {
+                // If reaching bottom edge of screen, break loop
+                break;
+            }
             for j in 0..8 {
                 let sprite_pixel = pick_bit(sprite_byte, j);
                 // Index of pixel on screen
-                let pixel_index = x_coord + y_coord * SCREEN_WIDTH as u8;
-                
-                if self.screen[pixel_index] && sprite_pixel {}
+                let pixel_index = (x_coord + y_coord) as usize * SCREEN_WIDTH;
 
-                todo!()
+                if x_coord as usize >= SCREEN_WIDTH {
+                    // If reaching right edge of screen, continue to next row
+                    break;
+                } else if self.screen[pixel_index] && (sprite_pixel != 0) {
+                    // If the pixel on screen and in sprite
+                    // are on then turn off screen pixel
+                    self.screen[pixel_index] = false;
+                    self.v_reg[CARRY_REGISTER] = 0x1;
+                } else if sprite_pixel != 0 {
+                    // Else if sprite pixel is on but screen pixel is not
+                    // turn on screen pixel
+                    self.screen[pixel_index] = true;
+                }
+                x_coord += 1;
             }
+
         }
     }
 }
-
 
 //************************************************************//
 //                     HELPER FUNCTIONS                       //
@@ -416,6 +432,6 @@ fn decode_middle_registers(opcode: u16) -> (usize, usize) {
 }
 
 /// Get the nth bit in a byte
-fn pick_bit(byte: u8, n: u8) -> u8 {
-    (byte >> n) & 0x1
+fn pick_bit(byte: u8, n: u8) -> bool {
+    ((byte >> n) & 0x1) != 0
 }
