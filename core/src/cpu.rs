@@ -57,11 +57,17 @@ impl Cpu {
         self.redraw_flag = false;
     }
 
-    fn set_carry_register(&mut self, value: u8) {
+    fn set_carry(&mut self, value: u8) {
         self.v_reg[CARRY_REGISTER] = value;
     }
 
-    // TODO Create getter and setter for registers
+    fn set_reg(&mut self, register: u16, value: u8) {
+        self.v_reg[register as usize] = value;
+    }
+
+    fn get_reg(&self, register: u16) -> u8 {
+        self.v_reg[register as usize]
+    }
 
     pub fn cycle(&mut self, screen: &mut Screen) -> Result<()> {
         // Check if ROM as been loaded into RAM
@@ -175,9 +181,9 @@ impl Cpu {
     /// Opcode 3XNN
     /// Skip next instruction if VX == NN
     fn skip_equal(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
+        let register = (opcode & 0x0F00) >> 8;
         let number = (opcode & 0x00FF) as u8;
-        if number == self.v_reg[register] {
+        if number == self.get_reg(register) {
             self.pc += 2;
         }
     }
@@ -185,9 +191,9 @@ impl Cpu {
     /// Opcode 4XNN
     /// Skip next instruction if VX != NN
     fn skip_not_equal(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
+        let register = (opcode & 0x0F00) >> 8;
         let number = (opcode & 0x00FF) as u8;
-        if number != self.v_reg[register] {
+        if number != self.get_reg(register) {
             self.pc += 2;
         }
     }
@@ -196,7 +202,7 @@ impl Cpu {
     /// Skip next instruction if VX == VY
     fn skip_register_equal(&mut self, opcode: u16) {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
-        if self.v_reg[reg_x] == self.v_reg[reg_y] {
+        if self.get_reg(reg_x) == self.get_reg(reg_y) {
             self.pc += 2;
         }
     }
@@ -204,36 +210,37 @@ impl Cpu {
     /// Opcode 6XNN
     /// Load NN into VX
     fn load_number(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
+        let register = (opcode & 0x0F00) >> 8;
         let number = (opcode & 0x00FF) as u8;
-        self.v_reg[register] = number;
+        self.set_reg(register, number);
     }
 
     /// Opcode 7XNN
     /// Add NN to VX (VX += NN)
     fn add_number(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
+        let register = (opcode & 0x0F00) >> 8;
         let number = (opcode & 0x00FF) as u8;
-        self.v_reg[register] = self.v_reg[register].wrapping_add(number);
+        let result = self.get_reg(register).wrapping_add(number);
+        self.set_reg(register, result);
     }
 
     /// Opcode 8XY1 to 8XY3
     /// Load op(VX, VY) into VX
     fn load_register_op<F: Fn(u8, u8) -> u8>(&mut self, opcode: u16, op: F) {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
-        let value = op(self.v_reg[reg_x], self.v_reg[reg_y]);
-        self.v_reg[reg_x] = value;
+        let result = op(self.get_reg(reg_x), self.get_reg(reg_y));
+        self.set_reg(reg_x, result);
     }
 
     /// Opcode 8XY4
     /// Add value of VY to VX (VX += VY) and enable carry register if overflowing
     fn add_register_carry(&mut self, opcode: u16) {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
-        let result = self.v_reg[reg_x].wrapping_add(self.v_reg[reg_y]);
-        self.v_reg[reg_x] = result;
+        let result = self.get_reg(reg_x).wrapping_add(self.get_reg(reg_y));
+        self.set_reg(reg_x, result);
 
         // Enable carry register if addition overflows
-        self.set_carry_register((result < self.v_reg[reg_x]) as u8);
+        self.set_carry((result < self.get_reg(reg_x)) as u8);
     }
 
     /// Opcode 8XY5
@@ -243,20 +250,20 @@ impl Cpu {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
 
         // Enable carry register if subtraction borrows
-        let not_borrow = (self.v_reg[reg_x] > self.v_reg[reg_y]) as u8;
-        self.set_carry_register(not_borrow);
+        let not_borrow = (self.get_reg(reg_x) > self.get_reg(reg_y)) as u8;
+        self.set_carry(not_borrow);
 
-        let result = self.v_reg[reg_x].wrapping_sub(self.v_reg[reg_y]);
-        self.v_reg[reg_x] = result;
+        let result = self.get_reg(reg_x).wrapping_sub(self.get_reg(reg_y));
+        self.set_reg(reg_x, result);
     }
 
     /// Opcode 8XY6
     /// Set carry register to least significant bit of VX
     /// and shift VX one bit right
     fn shift_right(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
-        self.set_carry_register(self.v_reg[register] & 0x1);
-        self.v_reg[register] >>= 1;
+        let register = (opcode & 0x0F00) >> 8;
+        self.set_carry(self.get_reg(register) & 0x1);
+        self.set_reg(register, self.get_reg(register) >> 1);
     }
 
     /// Opcode 8XY7
@@ -266,11 +273,11 @@ impl Cpu {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
 
         // Enable carry register if subtraction borrows
-        let not_borrow = (self.v_reg[reg_y] > self.v_reg[reg_x]) as u8;
-        self.set_carry_register(not_borrow);
+        let not_borrow = (self.get_reg(reg_y) > self.get_reg(reg_x)) as u8;
+        self.set_carry(not_borrow);
 
-        let result = self.v_reg[reg_y].wrapping_sub(self.v_reg[reg_x]);
-        self.v_reg[reg_x] = result;
+        let result = self.get_reg(reg_y).wrapping_sub(self.get_reg(reg_x));
+        self.set_reg(reg_x, result);
     }
 
     /// Opcode 8XYE
@@ -278,7 +285,7 @@ impl Cpu {
     /// and shift VX one bit left
     fn shift_left(&mut self, opcode: u16) {
         let register = ((opcode & 0x0F00) >> 8) as usize;
-        self.set_carry_register(self.v_reg[register] & 0x1);
+        self.set_carry(self.v_reg[register] & 0x1);
         self.v_reg[register] <<= 1;
     }
 
@@ -286,7 +293,7 @@ impl Cpu {
     /// Skip next instruction if VX != VY
     fn skip_register_not_equal(&mut self, opcode: u16) {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
-        if self.v_reg[reg_x] != self.v_reg[reg_y] {
+        if self.get_reg(reg_x) != self.get_reg(reg_y) {
             self.pc += 2;
         }
     }
@@ -300,7 +307,7 @@ impl Cpu {
     /// Opcode BNNN
     /// Jump to address at V0 + NNN
     fn jump_plus(&mut self, opcode: u16) {
-        self.pc = self.v_reg[0] as u16 + (opcode & 0x0FFF);
+        self.pc = self.get_reg(0) as u16 + (opcode & 0x0FFF);
     }
 
     /// Opcode CXNN
@@ -325,15 +332,15 @@ impl Cpu {
         }
 
         // Set x and y coords to VX and VY with wrapping for the starting coord
-        let x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
-        let y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
+        let x_coord = self.get_reg(reg_x) % SCREEN_WIDTH as u8;
+        let y_coord = self.get_reg(reg_y) % SCREEN_HEIGHT as u8;
 
         let sprite = self.ram.read_slice(self.i_reg, rows);
 
         // Draw sprite on screen
         let carry = screen.draw(sprite, x_coord, y_coord);
         // Set carry register
-        self.set_carry_register(carry);
+        self.set_carry(carry);
         self.redraw_flag = true;
 
         Ok(())

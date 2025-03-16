@@ -1,7 +1,7 @@
 /// Get the register numbers X and Y in an opcode: NXYN
-pub fn decode_middle_registers(opcode: u16) -> (usize, usize) {
-    let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-    let reg_y = ((opcode & 0x00F0) >> 4) as usize;
+pub fn decode_middle_registers(opcode: u16) -> (u16, u16) {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
     (reg_x, reg_y)
 }
 
