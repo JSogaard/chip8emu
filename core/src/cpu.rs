@@ -59,6 +59,10 @@ impl Cpu {
         self.redraw_flag = false;
     }
 
+    fn set_carry_register(&mut self, value: u8) {
+        self.v_reg[CARRY_REGISTER] = value;
+    }
+
     pub fn cycle(&mut self) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.ram.rom_loaded() {
@@ -224,7 +228,7 @@ impl Cpu {
         self.v_reg[reg_x] = result;
 
         // Enable carry register if addition overflows
-        self.v_reg[CARRY_REGISTER] = (result < self.v_reg[reg_x]) as u8;
+        self.set_carry_register((result < self.v_reg[reg_x]) as u8);
     }
 
     /// Opcode 8XY5
@@ -235,7 +239,7 @@ impl Cpu {
 
         // Enable carry register if subtraction borrows
         let not_borrow = (self.v_reg[reg_x] > self.v_reg[reg_y]) as u8;
-        self.v_reg[CARRY_REGISTER] = not_borrow;
+        self.set_carry_register(not_borrow);
 
         let result = self.v_reg[reg_x].wrapping_sub(self.v_reg[reg_y]);
         self.v_reg[reg_x] = result;
@@ -246,7 +250,7 @@ impl Cpu {
     /// and shift VX one bit right
     fn shift_right(&mut self, opcode: u16) {
         let register = ((opcode & 0x0F00) >> 8) as usize;
-        self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
+        self.set_carry_register(self.v_reg[register] & 0x1);
         self.v_reg[register] >>= 1;
     }
 
@@ -258,7 +262,7 @@ impl Cpu {
 
         // Enable carry register if subtraction borrows
         let not_borrow = (self.v_reg[reg_y] > self.v_reg[reg_x]) as u8;
-        self.v_reg[CARRY_REGISTER] = not_borrow;
+        self.set_carry_register(not_borrow);
 
         let result = self.v_reg[reg_y].wrapping_sub(self.v_reg[reg_x]);
         self.v_reg[reg_x] = result;
@@ -269,7 +273,7 @@ impl Cpu {
     /// and shift VX one bit left
     fn shift_left(&mut self, opcode: u16) {
         let register = ((opcode & 0x0F00) >> 8) as usize;
-        self.v_reg[CARRY_REGISTER] = self.v_reg[register] & 0x1;
+        self.set_carry_register(self.v_reg[register] & 0x1);
         self.v_reg[register] <<= 1;
     }
 
@@ -318,12 +322,13 @@ impl Cpu {
         // Set x and y coords to VX and VY with wrapping for the starting coord
         let x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
         let y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
-        self.v_reg[CARRY_REGISTER] = 0;
 
         let sprite = self.ram.read_slice(self.i_reg, rows);
 
         // Call Screen.draw()
-        self.screen.draw(sprite, x_coord, y_coord);
+        // Set carry register
+        let carry = self.screen.draw(sprite, x_coord, y_coord);
+        self.set_carry_register(carry);
         self.redraw_flag = true;
 
         Ok(())
