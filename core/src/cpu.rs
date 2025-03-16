@@ -9,6 +9,7 @@ use crate::stack::Stack;
 pub const NUM_REGS: usize = 16;
 pub const CARRY_REGISTER: usize = NUM_REGS - 1;
 
+#[derive(Debug)]
 pub struct Cpu {
     // Program counter
     pc: u16,
@@ -63,6 +64,8 @@ impl Cpu {
         self.v_reg[CARRY_REGISTER] = value;
     }
 
+    // TODO Create getter and setter for registers
+
     pub fn cycle(&mut self) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.ram.rom_loaded() {
@@ -106,9 +109,13 @@ impl Cpu {
 
             // Register loading op codes
             0x8000 => match opcode & 0x000F {
+                // Simple load instruction
                 0x0 => self.load_register_op(opcode, |_, vy| vy),
+                // OR
                 0x1 => self.load_register_op(opcode, |vx, vy| vx | vy),
+                // AND
                 0x2 => self.load_register_op(opcode, |vx, vy| vx & vy),
+                // XOR
                 0x3 => self.load_register_op(opcode, |vx, vy| vx ^ vy),
                 0x4 => self.add_register_carry(opcode),
                 0x5 => self.sub_register(opcode),
@@ -325,9 +332,9 @@ impl Cpu {
 
         let sprite = self.ram.read_slice(self.i_reg, rows);
 
-        // Call Screen.draw()
-        // Set carry register
+        // Draw sprite on screen
         let carry = self.screen.draw(sprite, x_coord, y_coord);
+        // Set carry register
         self.set_carry_register(carry);
         self.redraw_flag = true;
 

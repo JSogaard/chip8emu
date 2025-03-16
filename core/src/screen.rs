@@ -3,6 +3,7 @@ use crate::helpers::bit_to_bool;
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
+#[derive(Debug)]
 pub struct Screen {
     pixels: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
 }
@@ -26,7 +27,7 @@ impl Screen {
             }
 
             for j in 0..8 {
-                let sprite_pixel = bit_to_bool(sprite_byte, j);
+                let sprite_pixel = bit_to_bool(*sprite_byte, j);
                 // Index of pixel on screen
                 let x_pos = x_coord + j;
                 let pixel_index = y_pos as usize * SCREEN_WIDTH + x_pos as usize;

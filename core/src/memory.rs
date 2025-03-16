@@ -26,6 +26,7 @@ pub const FONTSET: [u8; FONTSET_SIZE] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
+#[derive(Debug)]
 pub struct Memory {
     ram: [u8; RAM_SIZE],
     rom_loaded: bool,

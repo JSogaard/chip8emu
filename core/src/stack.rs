@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 
 pub const STACK_SIZE: usize = 16;
 
+#[derive(Debug)]
 pub struct Stack {
     stack: [u16; STACK_SIZE],
     // Stack pointer
