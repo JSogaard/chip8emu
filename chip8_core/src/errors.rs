@@ -17,7 +17,7 @@ pub enum Error {
     #[error("Stack underflow")]
     StackUnderflowError,
 
-    #[error("Reached invalid address in RAM")]
+    #[error("Reached or accessed invalid address in RAM")]
     InvalidRamAddressError,
 
     #[error("No ROM as been loaded yet")]

@@ -1,94 +1,46 @@
 use rand::Rng;
 
-use crate::errors::Error;
-use crate::errors::Result;
+use crate::errors::{Error, Result};
+use crate::helpers::decode_middle_registers;
+use crate::memory::{Memory, RAM_SIZE, START_ADDR};
+use crate::screen::{Screen, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::stack::Stack;
 
-pub const RAM_SIZE: usize = 4096;
 pub const NUM_REGS: usize = 16;
 pub const CARRY_REGISTER: usize = NUM_REGS - 1;
-pub const STACK_SIZE: usize = 16;
-pub const START_ADDR: u16 = 0x200;
-pub const MAX_ROM_SIZE: usize = RAM_SIZE - START_ADDR as usize;
 
-pub const SCREEN_WIDTH: usize = 64;
-pub const SCREEN_HEIGHT: usize = 32;
-
-pub const FONTSET_SIZE: usize = 16 * 5;
-pub const FONTSET_ADDR: u16 = 0x050;
-pub const FONTSET: [u8; FONTSET_SIZE] = [
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-    0x20, 0x60, 0x20, 0x20, 0x70, // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
-];
-
-pub struct Emulator {
+pub struct Cpu {
     // Program counter
     pc: u16,
-    ram: [u8; RAM_SIZE],
-    screen: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
+    ram: Memory,
+    screen: Screen,
     // General purpose registers
     v_reg: [u8; NUM_REGS],
     // Index register
     i_reg: u16,
-    // Stack pointer
-    sp: u16,
-    stack: [u16; STACK_SIZE],
+    stack: Stack,
     // Sound timer
     st: u8,
     // Delay timer
     dt: u8,
     redraw_flag: bool,
-    rom_loaded: bool,
     rng: rand::rngs::ThreadRng,
 }
 
-impl Emulator {
+impl Cpu {
     pub fn new() -> Self {
-        let mut emulator = Self {
+        Self {
             pc: START_ADDR,
-            ram: [0; RAM_SIZE],
-            screen: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
+            ram: Memory::new(),
+            screen: Screen::new(),
             v_reg: [0; NUM_REGS],
             i_reg: 0,
-            sp: 0,
-            stack: [0; STACK_SIZE],
+            stack: Stack::new(),
             st: 0,
             dt: 0,
             redraw_flag: false,
-            rom_loaded: false,
             rng: rand::rng(),
-        };
-
-        // Copying font set into ram from address 0x50 (80)
-        // Get target location in RAM as slice and copy font set to it
-        emulator.ram[FONTSET_ADDR as usize..(FONTSET_ADDR as usize + FONTSET_SIZE)]
-            .copy_from_slice(&FONTSET);
-
-        emulator
-    }
-
-    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
-        if rom.len() <= MAX_ROM_SIZE {
-            self.ram[START_ADDR as usize..].copy_from_slice(rom);
-        } else {
-            return Err(Error::InvalidRomSizeError);
         }
-        self.rom_loaded = true;
-
-        Ok(())
     }
 
     pub fn redraw_flag(&self) -> bool {
@@ -97,21 +49,19 @@ impl Emulator {
 
     pub fn reset(&mut self) {
         self.pc = START_ADDR;
-        self.ram = [0; RAM_SIZE];
-        self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+        self.ram.reset();
+        self.screen.reset();
         self.v_reg = [0; NUM_REGS];
         self.i_reg = 0;
-        self.sp = 0;
-        self.stack = [0; STACK_SIZE];
+        self.stack.reset();
         self.st = 0;
         self.dt = 0;
         self.redraw_flag = false;
-        self.rom_loaded = false;
     }
 
     pub fn cycle(&mut self) -> Result<()> {
         // Check if ROM as been loaded into RAM
-        if !self.rom_loaded {
+        if !self.ram.rom_loaded() {
             return Err(Error::MissingRomError);
         }
 
@@ -122,8 +72,8 @@ impl Emulator {
 
         self.redraw_flag = false;
         // Get opcode as u16
-        let high_byte = self.ram[self.pc as usize] as u16;
-        let low_byte = self.ram[(self.pc + 1) as usize] as u16;
+        let high_byte = self.ram.read(self.pc) as u16;
+        let low_byte = self.ram.read(self.pc + 1) as u16;
         let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
 
@@ -175,29 +125,6 @@ impl Emulator {
         todo!()
     }
 
-    /// Push return address to stack
-    fn push(&mut self, val: u16) -> Result<()> {
-        // Check for stack overflow
-        if self.sp >= STACK_SIZE as u16 {
-            return Err(Error::StackOverflowError);
-        }
-
-        self.stack[self.sp as usize] = val;
-        self.sp += 1;
-
-        Ok(())
-    }
-
-    /// Pop return address from stack
-    fn pop(&mut self) -> Result<u16> {
-        if self.sp == 0 {
-            return Err(Error::StackUnderflowError);
-        }
-
-        self.sp -= 1;
-        Ok(self.stack[self.sp as usize])
-    }
-
     //************************************************************//
     //                      OPCODE METHODS                        //
     //************************************************************//
@@ -205,7 +132,7 @@ impl Emulator {
     /// Opcode 00E0
     /// Clear screen
     fn clear_screen(&mut self) {
-        self.screen = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
+        self.screen.reset();
         self.redraw_flag = true;
     }
 
@@ -213,7 +140,7 @@ impl Emulator {
     /// Return from subroutine
     fn return_subroutine(&mut self) -> Result<()> {
         // Pop return address from stack and set PC to it
-        let return_address = self.pop()?;
+        let return_address = self.stack.pop()?;
         self.pc = return_address;
 
         Ok(())
@@ -229,7 +156,7 @@ impl Emulator {
     /// Call subroutine at address NNN
     fn call_subroutine(&mut self, opcode: u16) -> Result<()> {
         // PC is pushed to stack to remember where to return after subroutine
-        self.push(self.pc)?;
+        self.stack.push(self.pc)?;
         let address = opcode & 0x0FFF;
         self.pc = address;
 
@@ -379,59 +306,26 @@ impl Emulator {
     /// Opcode DXYN
     /// Draws N-byte (heigh of N pixels) on screen and enables
     /// carry register if there is collision
-    fn draw_sprite(&mut self, opcode: u16) {
+    fn draw_sprite(&mut self, opcode: u16) -> Result<()> {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
-        let rows = (opcode & 0x000F) as usize;
-        let sprite = self.i_reg;
+        let rows = opcode & 0x000F;
+
+        // Check if sprite bounds are within valid RAM addresses
+        if self.i_reg + rows > RAM_SIZE as u16 {
+            return Err(Error::InvalidRamAddressError);
+        }
+
         // Set x and y coords to VX and VY with wrapping for the starting coord
-        let mut x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
-        let mut y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
+        let x_coord = self.v_reg[reg_x] % SCREEN_WIDTH as u8;
+        let y_coord = self.v_reg[reg_y] % SCREEN_HEIGHT as u8;
         self.v_reg[CARRY_REGISTER] = 0;
 
-        for i in 0..rows {
-            let sprite_byte = self.ram[self.i_reg as usize + i];
-            
-            if y_coord as usize >= SCREEN_HEIGHT {
-                // If reaching bottom edge of screen, break loop
-                break;
-            }
-            for j in 0..8 {
-                let sprite_pixel = pick_bit(sprite_byte, j);
-                // Index of pixel on screen
-                let pixel_index = (x_coord + y_coord) as usize * SCREEN_WIDTH;
+        let sprite = self.ram.read_slice(self.i_reg, rows);
 
-                if x_coord as usize >= SCREEN_WIDTH {
-                    // If reaching right edge of screen, continue to next row
-                    break;
-                } else if self.screen[pixel_index] && (sprite_pixel != 0) {
-                    // If the pixel on screen and in sprite
-                    // are on then turn off screen pixel
-                    self.screen[pixel_index] = false;
-                    self.v_reg[CARRY_REGISTER] = 0x1;
-                } else if sprite_pixel != 0 {
-                    // Else if sprite pixel is on but screen pixel is not
-                    // turn on screen pixel
-                    self.screen[pixel_index] = true;
-                }
-                x_coord += 1;
-            }
+        // Call Screen.draw()
+        self.screen.draw(sprite, x_coord, y_coord);
+        self.redraw_flag = true;
 
-        }
+        Ok(())
     }
-}
-
-//************************************************************//
-//                     HELPER FUNCTIONS                       //
-//************************************************************//
-
-/// Get the register numbers X and Y in an opcode: NXYN
-fn decode_middle_registers(opcode: u16) -> (usize, usize) {
-    let reg_x = ((opcode & 0x0F00) >> 8) as usize;
-    let reg_y = ((opcode & 0x00F0) >> 4) as usize;
-    (reg_x, reg_y)
-}
-
-/// Get the nth bit in a byte
-fn pick_bit(byte: u8, n: u8) -> bool {
-    ((byte >> n) & 0x1) != 0
 }
