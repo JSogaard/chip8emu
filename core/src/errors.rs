@@ -21,7 +21,10 @@ pub enum Error {
     InvalidRamAddressError,
 
     #[error("No ROM as been loaded yet")]
-    MissingRomError
+    MissingRomError,
+
+    #[error("Failed to render window")]
+    ScreenInitError,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

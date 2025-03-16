@@ -1,18 +1,27 @@
-use crate::helpers::bit_to_bool;
+use sdl2::Sdl;
+
+use crate::{errors::{Error, Result}, helpers::bit_to_bool};
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
-#[derive(Debug)]
 pub struct Screen {
+    sdl: Sdl,
     pixels: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
 }
 
 impl Screen {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self> {
+        let sdl = match sdl2::init() {
+            Ok(sdl) => sdl,
+            Err(_) => return Err(Error::ScreenInitError),
+        };
+
+        let screen = Self {
+            sdl,
             pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
-        }
+        };
+        Ok(screen)
     }
 
     pub fn draw(&mut self, sprite: &[u8], x_coord: u8, y_coord: u8) -> u8 {
@@ -50,7 +59,7 @@ impl Screen {
         carry_register
     }
 
-    pub fn reset(&mut self) {
+    pub fn clear(&mut self) {
         self.pixels = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 }

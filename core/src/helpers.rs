@@ -10,3 +10,4 @@ pub fn decode_middle_registers(opcode: u16) -> (usize, usize) {
  pub fn bit_to_bool(byte: u8, n: u8) -> bool {
     ((byte >> (7 - n)) & 0x1) != 0
 }
+

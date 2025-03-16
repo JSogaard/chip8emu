@@ -14,7 +14,6 @@ pub struct Cpu {
     // Program counter
     pc: u16,
     ram: Memory,
-    screen: Screen,
     // General purpose registers
     v_reg: [u8; NUM_REGS],
     // Index register
@@ -33,7 +32,6 @@ impl Cpu {
         Self {
             pc: START_ADDR,
             ram: Memory::new(),
-            screen: Screen::new(),
             v_reg: [0; NUM_REGS],
             i_reg: 0,
             stack: Stack::new(),
@@ -51,7 +49,6 @@ impl Cpu {
     pub fn reset(&mut self) {
         self.pc = START_ADDR;
         self.ram.reset();
-        self.screen.reset();
         self.v_reg = [0; NUM_REGS];
         self.i_reg = 0;
         self.stack.reset();
@@ -66,7 +63,7 @@ impl Cpu {
 
     // TODO Create getter and setter for registers
 
-    pub fn cycle(&mut self) -> Result<()> {
+    pub fn cycle(&mut self, screen: &mut Screen) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.ram.rom_loaded() {
             return Err(Error::MissingRomError);
@@ -88,7 +85,7 @@ impl Cpu {
         // Filter op code to match only the first half byte
         match opcode & 0xF000 {
             0x0000 => match opcode {
-                0x00E0 => self.clear_screen(),
+                0x00E0 => screen.clear(),
                 0x00EE => self.return_subroutine()?,
                 // If op code is 0NNN - call machine code subroutine,
                 // which isn't implemented.
@@ -129,6 +126,7 @@ impl Cpu {
             0xA000 => self.load_i(opcode),
             0xB000 => self.jump_plus(opcode),
             0xC000 => self.random_and(opcode),
+            0xD000 => self.draw_sprite(opcode, screen)?,
 
             _ => return Err(Error::UnknownOpcodeError(opcode)),
         }
@@ -142,8 +140,8 @@ impl Cpu {
 
     /// Opcode 00E0
     /// Clear screen
-    fn clear_screen(&mut self) {
-        self.screen.reset();
+    fn clear_screen(&mut self, screen: &mut Screen) {
+        screen.clear();
         self.redraw_flag = true;
     }
 
@@ -317,7 +315,7 @@ impl Cpu {
     /// Opcode DXYN
     /// Draws N-byte (heigh of N pixels) on screen and enables
     /// carry register if there is collision
-    fn draw_sprite(&mut self, opcode: u16) -> Result<()> {
+    fn draw_sprite(&mut self, opcode: u16, screen: &mut Screen) -> Result<()> {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
         let rows = opcode & 0x000F;
 
@@ -333,7 +331,7 @@ impl Cpu {
         let sprite = self.ram.read_slice(self.i_reg, rows);
 
         // Draw sprite on screen
-        let carry = self.screen.draw(sprite, x_coord, y_coord);
+        let carry = screen.draw(sprite, x_coord, y_coord);
         // Set carry register
         self.set_carry_register(carry);
         self.redraw_flag = true;
