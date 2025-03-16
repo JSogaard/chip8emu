@@ -24,7 +24,7 @@ pub enum Error {
     MissingRomError,
 
     #[error("Failed to render window")]
-    ScreenInitError,
+    WindowRenderError,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

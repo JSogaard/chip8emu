@@ -69,6 +69,19 @@ impl Cpu {
         self.v_reg[register as usize]
     }
 
+    pub fn tick_timers(&mut self) {
+        if self.dt > 0 {
+            self.dt -= 1;
+        }
+        if self.st > 0 {
+            self.st -= 1;
+        }
+    }
+
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
+        self.ram.load_rom(rom)
+    }
+
     pub fn cycle(&mut self, screen: &mut Screen) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.ram.rom_loaded() {
