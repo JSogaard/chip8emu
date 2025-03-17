@@ -1,16 +1,16 @@
 use rand::Rng;
 
+use crate::display::{Display, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::errors::{Error, Result};
 use crate::helpers::decode_middle_registers;
 use crate::memory::{Memory, RAM_SIZE, START_ADDR};
-use crate::screen::{Screen, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::stack::Stack;
 
 pub const NUM_REGS: usize = 16;
 pub const CARRY_REGISTER: usize = NUM_REGS - 1;
 
 #[derive(Debug)]
-pub struct Cpu {
+pub struct Processor {
     // Program counter
     pc: u16,
     ram: Memory,
@@ -23,13 +23,15 @@ pub struct Cpu {
     st: u8,
     // Delay timer
     dt: u8,
-    redraw_flag: bool,
     rng: rand::rngs::ThreadRng,
 }
 
-impl Cpu {
-    pub fn new() -> Self {
-        Self {
+impl Processor {
+    pub fn new(rom: &[u8]) -> Result<Self> {
+        let mut memory = Memory::new();
+        memory.load_rom(rom)?;
+
+        Ok(Self {
             pc: START_ADDR,
             ram: Memory::new(),
             v_reg: [0; NUM_REGS],
@@ -37,13 +39,8 @@ impl Cpu {
             stack: Stack::new(),
             st: 0,
             dt: 0,
-            redraw_flag: false,
             rng: rand::rng(),
-        }
-    }
-
-    pub fn redraw_flag(&self) -> bool {
-        self.redraw_flag
+        })
     }
 
     pub fn reset(&mut self) {
@@ -54,7 +51,6 @@ impl Cpu {
         self.stack.reset();
         self.st = 0;
         self.dt = 0;
-        self.redraw_flag = false;
     }
 
     fn set_carry(&mut self, value: u8) {
@@ -78,11 +74,7 @@ impl Cpu {
         }
     }
 
-    pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
-        self.ram.load_rom(rom)
-    }
-
-    pub fn cycle(&mut self, screen: &mut Screen) -> Result<()> {
+    pub fn cycle(&mut self, display: &mut Display) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.ram.rom_loaded() {
             return Err(Error::MissingRomError);
@@ -93,7 +85,6 @@ impl Cpu {
             return Err(Error::InvalidRamAddressError);
         }
 
-        self.redraw_flag = false;
         // Get opcode as u16
         let high_byte = self.ram.read(self.pc) as u16;
         let low_byte = self.ram.read(self.pc + 1) as u16;
@@ -104,7 +95,7 @@ impl Cpu {
         // Filter op code to match only the first half byte
         match opcode & 0xF000 {
             0x0000 => match opcode {
-                0x00E0 => screen.clear(),
+                0x00E0 => display.clear(),
                 0x00EE => self.return_subroutine()?,
                 // If op code is 0NNN - call machine code subroutine,
                 // which isn't implemented.
@@ -145,12 +136,13 @@ impl Cpu {
             0xA000 => self.load_i(opcode),
             0xB000 => self.jump_plus(opcode),
             0xC000 => self.random_and(opcode),
-            0xD000 => self.draw_sprite(opcode, screen)?,
+            0xD000 => self.draw_sprite(opcode, display)?,
 
             _ => return Err(Error::UnknownOpcodeError(opcode)),
         }
 
-        todo!()
+        // TODO Finish cycle
+        Ok(())
     }
 
     //************************************************************//
@@ -159,9 +151,8 @@ impl Cpu {
 
     /// Opcode 00E0
     /// Clear screen
-    fn clear_screen(&mut self, screen: &mut Screen) {
-        screen.clear();
-        self.redraw_flag = true;
+    fn clear_display(&mut self, display: &mut Display) {
+        display.clear();
     }
 
     /// Opcode 00EE
@@ -335,7 +326,7 @@ impl Cpu {
     /// Opcode DXYN
     /// Draws N-byte (heigh of N pixels) on screen and enables
     /// carry register if there is collision
-    fn draw_sprite(&mut self, opcode: u16, screen: &mut Screen) -> Result<()> {
+    fn draw_sprite(&mut self, opcode: u16, display: &mut Display) -> Result<()> {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
         let rows = opcode & 0x000F;
 
@@ -351,11 +342,9 @@ impl Cpu {
         let sprite = self.ram.read_slice(self.i_reg, rows);
 
         // Draw sprite on screen
-        let carry = screen.draw(sprite, x_coord, y_coord);
+        let carry = display.draw(sprite, x_coord, y_coord);
         // Set carry register
         self.set_carry(carry);
-        self.redraw_flag = true;
-
         Ok(())
     }
 }

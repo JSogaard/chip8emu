@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Failed to render window")]
     WindowRenderError,
+
+    #[error("Failed to read ROM file")]
+    RomFileReadError(#[from] std::io::Error)
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
