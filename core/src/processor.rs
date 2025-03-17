@@ -13,7 +13,7 @@ pub const CARRY_REGISTER: usize = NUM_REGS - 1;
 pub struct Processor {
     // Program counter
     pc: u16,
-    ram: Memory,
+    memory: Memory,
     // General purpose registers
     v_reg: [u8; NUM_REGS],
     // Index register
@@ -33,7 +33,7 @@ impl Processor {
 
         Ok(Self {
             pc: START_ADDR,
-            ram: Memory::new(),
+            memory,
             v_reg: [0; NUM_REGS],
             i_reg: 0,
             stack: Stack::new(),
@@ -45,7 +45,7 @@ impl Processor {
 
     pub fn reset(&mut self) {
         self.pc = START_ADDR;
-        self.ram.reset();
+        self.memory.reset();
         self.v_reg = [0; NUM_REGS];
         self.i_reg = 0;
         self.stack.reset();
@@ -76,7 +76,7 @@ impl Processor {
 
     pub fn cycle(&mut self, display: &mut Display) -> Result<()> {
         // Check if ROM as been loaded into RAM
-        if !self.ram.rom_loaded() {
+        if !self.memory.rom_loaded() {
             return Err(Error::MissingRomError);
         }
 
@@ -86,8 +86,8 @@ impl Processor {
         }
 
         // Get opcode as u16
-        let high_byte = self.ram.read(self.pc) as u16;
-        let low_byte = self.ram.read(self.pc + 1) as u16;
+        let high_byte = self.memory.read(self.pc) as u16;
+        let low_byte = self.memory.read(self.pc + 1) as u16;
         let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
 
@@ -339,7 +339,7 @@ impl Processor {
         let x_coord = self.get_reg(reg_x) % SCREEN_WIDTH as u8;
         let y_coord = self.get_reg(reg_y) % SCREEN_HEIGHT as u8;
 
-        let sprite = self.ram.read_slice(self.i_reg, rows);
+        let sprite = self.memory.read_slice(self.i_reg, rows);
 
         // Draw sprite on screen
         let carry = display.draw(sprite, x_coord, y_coord);
