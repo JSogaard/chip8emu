@@ -1,9 +1,17 @@
 use sdl2::{event::Event, keyboard::Keycode, EventPump, Sdl};
 use std::{
-    fs::File, io::Read, thread::sleep, time::{Duration, Instant}
+    fs::File,
+    io::Read,
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
-use crate::{display::Display, errors::Result, input::Input, processor::Processor};
+use crate::{
+    display::Display,
+    errors::{Error, Result},
+    input::Input,
+    processor::Processor,
+};
 
 const FRAME_RATE: u32 = 60;
 const CLOCK_SPEED: u32 = 500;
@@ -19,14 +27,14 @@ pub struct Emulator {
 
 impl Emulator {
     pub fn new(rom_path: &str) -> Result<Self> {
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
+        let sdl_context = sdl2::init().map_err(Error::SdlError)?;
+        let video_subsystem = sdl_context.video().map_err(Error::SdlError)?;
 
         let mut rom_file = File::open(rom_path)?;
         let mut rom = Vec::new();
         rom_file.read_to_end(&mut rom)?;
 
-        let event_pump = sdl_context.event_pump().unwrap();
+        let event_pump = sdl_context.event_pump().map_err(Error::SdlError)?;
 
         Ok(Self {
             processor: Processor::new(&rom)?,
@@ -37,7 +45,7 @@ impl Emulator {
         })
     }
 
-    pub fn run(&mut self) -> Result <()> {
+    pub fn run(&mut self) -> Result<()> {
         let frame_length = Duration::from_secs_f64(1. / FRAME_RATE as f64);
 
         'main_loop: loop {
@@ -76,7 +84,6 @@ impl Emulator {
             if elapsed < frame_length {
                 sleep(frame_length - elapsed);
             }
-
         }
 
         Ok(())

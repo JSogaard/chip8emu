@@ -1,6 +1,5 @@
 use sdl2::keyboard::Keycode;
 
-
 pub struct Input {
     keys: [bool; 16],
 }

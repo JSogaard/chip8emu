@@ -23,11 +23,13 @@ pub enum Error {
     #[error("No ROM as been loaded yet")]
     MissingRomError,
 
-    #[error("Failed to render window")]
-    WindowRenderError,
+    #[error("SDL Error:\n{0}")]
+    SdlError(String),
 
     #[error("Failed to read ROM file")]
     RomFileReadError(#[from] std::io::Error)
+
+
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
