@@ -6,6 +6,6 @@ pub mod processor;
 pub mod memory;
 pub mod stack;
 pub mod display;
-pub mod keypad;
+pub mod input;
 pub mod errors;
 pub mod helpers;

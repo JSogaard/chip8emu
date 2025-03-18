@@ -3,6 +3,7 @@ use rand::Rng;
 use crate::display::{Display, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::errors::{Error, Result};
 use crate::helpers::decode_middle_registers;
+use crate::input::Input;
 use crate::memory::{Memory, RAM_SIZE, START_ADDR};
 use crate::stack::Stack;
 
@@ -74,7 +75,7 @@ impl Processor {
         }
     }
 
-    pub fn cycle(&mut self, display: &mut Display) -> Result<()> {
+    pub fn cycle(&mut self, display: &mut Display, input: &mut Input) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.memory.rom_loaded() {
             return Err(Error::MissingRomError);
@@ -347,4 +348,6 @@ impl Processor {
         self.set_carry(carry);
         Ok(())
     }
+
+    // TODO Remaining opcodes
 }
