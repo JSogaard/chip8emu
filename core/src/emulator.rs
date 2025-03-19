@@ -14,7 +14,7 @@ use crate::{
 };
 
 const FRAME_RATE: u32 = 60;
-const CLOCK_SPEED: u32 = 500;
+const CLOCK_SPEED: u32 = 600;
 const CYCLES_PER_FRAME: u32 = CLOCK_SPEED / FRAME_RATE + 1;
 
 pub struct Emulator {
@@ -35,6 +35,8 @@ impl Emulator {
         rom_file.read_to_end(&mut rom)?;
 
         let event_pump = sdl_context.event_pump().map_err(Error::SdlError)?;
+
+        // TODO set up beep
 
         Ok(Self {
             processor: Processor::new(&rom)?,
@@ -72,14 +74,14 @@ impl Emulator {
                 }
             }
 
-            self.processor.tick_timers();
-
             // Run CPU cycles
             for _ in 0..CYCLES_PER_FRAME {
                 self.processor.cycle(&mut self.display, &mut self.input)?;
             }
 
             self.display.render();
+
+            // TODO Check sount timer and make beep
 
             // Frame timing
             let elapsed = frame_start.elapsed();

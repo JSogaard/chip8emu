@@ -54,18 +54,6 @@ impl Processor {
         self.dt = 0;
     }
 
-    fn set_carry(&mut self, value: u8) {
-        self.v_reg[CARRY_REGISTER] = value;
-    }
-
-    fn set_reg(&mut self, register: u16, value: u8) {
-        self.v_reg[register as usize] = value;
-    }
-
-    fn get_reg(&self, register: u16) -> u8 {
-        self.v_reg[register as usize]
-    }
-
     pub fn tick_timers(&mut self) {
         if self.dt > 0 {
             self.dt -= 1;
@@ -73,6 +61,10 @@ impl Processor {
         if self.st > 0 {
             self.st -= 1;
         }
+    }
+
+    pub fn check_beep(&self) -> bool {
+        self.st > 0
     }
 
     pub fn cycle(&mut self, display: &mut Display, input: &mut Input) -> Result<()> {
@@ -150,6 +142,18 @@ impl Processor {
 
         // TODO Finish cycle
         Ok(())
+    }
+
+    fn set_carry(&mut self, value: u8) {
+        self.v_reg[CARRY_REGISTER] = value;
+    }
+
+    fn set_reg(&mut self, register: u16, value: u8) {
+        self.v_reg[register as usize] = value;
+    }
+
+    fn get_reg(&self, register: u16) -> u8 {
+        self.v_reg[register as usize]
     }
 
     //************************************************************//
@@ -357,7 +361,7 @@ impl Processor {
 
     /// Opcode EX9E
     /// Skip next instruction if key VX is pressed down. Do not wait for input
-    fn skip_if_keypress(&mut self, opcode: u16, input: &mut Input) {
+    fn skip_if_keypress(&mut self, opcode: u16, input: &Input) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if input.check_key(key) {
@@ -367,12 +371,35 @@ impl Processor {
 
     /// Opcode EXA1
     /// Skip next instruction if key VX is *not* pressed down. Do not wait for input
-    fn skip_if_not_keypress(&mut self, opcode: u16, input: &mut Input) {
+    fn skip_if_not_keypress(&mut self, opcode: u16, input: &Input) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if !input.check_key(key) {
             self.pc += 2;
         }
+    }
+
+    /// Opcode FX07
+    /// Load value of delay timer into VX
+    fn load_delay_timer(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        let value = self.dt;
+        self.set_reg(register, value);
+    }
+
+    /// Opcode FX0A
+    /// Wait for key press and store key value in VX. If no key is pressed
+    /// the PC is decremented to rerun opcode
+    fn wait_for_keypress(&mut self, opcode: u16, input: &Input) {
+        let register = (opcode & 0x0F00) >> 8;
+        let key = match input.check_all_keys() {
+            Some(key) => key,
+            None => {
+                self.pc -= 2;
+                return;
+            }
+        };
+        self.set_reg(register, key);
     }
 
     // TODO Remaining opcodes
