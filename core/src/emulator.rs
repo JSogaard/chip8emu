@@ -65,12 +65,14 @@ impl Emulator {
                         keycode: Some(keycode),
                         ..
                     } => {
-                        self.input.key_pressed(keycode);
+                        self.input.key_press(keycode);
                     }
 
                     _ => {}
                 }
             }
+
+            self.processor.tick_timers();
 
             // Run CPU cycles
             for _ in 0..CYCLES_PER_FRAME {

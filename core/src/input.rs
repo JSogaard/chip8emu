@@ -11,7 +11,12 @@ impl Input {
         }
     }
 
-    pub fn key_pressed(&mut self, keycode: Keycode) {
+    pub fn key_press(&mut self, keycode: Keycode) {
         // TODO Key press method
+    }
+
+    pub fn check_key(&self, key: u8) -> bool {
+        // TODO Check key method
+        todo!()
     }
 }

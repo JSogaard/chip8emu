@@ -115,7 +115,7 @@ impl Processor {
             0x6000 => self.load_number(opcode),
             0x7000 => self.add_number(opcode),
 
-            // Register loading op codes
+            // Register loading opcodes
             0x8000 => match opcode & 0x000F {
                 // Simple load instruction
                 0x0 => self.load_register_op(opcode, |_, vy| vy),
@@ -138,6 +138,12 @@ impl Processor {
             0xB000 => self.jump_plus(opcode),
             0xC000 => self.random_and(opcode),
             0xD000 => self.draw_sprite(opcode, display)?,
+            
+            0xE000 => match opcode & 0x00FF {
+                0x9E => self.skip_if_keypress(opcode, input),
+                0xA1 => self.skip_if_not_keypress(opcode, input),
+                _ => return Err(Error::UnknownOpcodeError(opcode)),
+            }
 
             _ => return Err(Error::UnknownOpcodeError(opcode)),
         }
@@ -347,6 +353,26 @@ impl Processor {
         // Set carry register
         self.set_carry(carry);
         Ok(())
+    }
+
+    /// Opcode EX9E
+    /// Skip next instruction if key VX is pressed down. Do not wait for input
+    fn skip_if_keypress(&mut self, opcode: u16, input: &mut Input) {
+        let register = (opcode & 0x0F00) >> 8;
+        let key = self.get_reg(register);
+        if input.check_key(key) {
+            self.pc += 2;
+        }
+    }
+
+    /// Opcode EXA1
+    /// Skip next instruction if key VX is *not* pressed down. Do not wait for input
+    fn skip_if_not_keypress(&mut self, opcode: u16, input: &mut Input) {
+        let register = (opcode & 0x0F00) >> 8;
+        let key = self.get_reg(register);
+        if !input.check_key(key) {
+            self.pc += 2;
+        }
     }
 
     // TODO Remaining opcodes
