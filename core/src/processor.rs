@@ -4,7 +4,7 @@ use crate::display::{Display, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::errors::{Error, Result};
 use crate::helpers::decode_middle_registers;
 use crate::input::Input;
-use crate::memory::{Memory, RAM_SIZE, START_ADDR};
+use crate::memory::{Memory, FONTSET_ADDR, RAM_SIZE, START_ADDR};
 use crate::stack::Stack;
 
 pub const NUM_REGS: usize = 16;
@@ -130,10 +130,18 @@ impl Processor {
             0xB000 => self.jump_plus(opcode),
             0xC000 => self.random_and(opcode),
             0xD000 => self.draw_sprite(opcode, display)?,
-            
+
             0xE000 => match opcode & 0x00FF {
                 0x9E => self.skip_if_keypress(opcode, input),
                 0xA1 => self.skip_if_not_keypress(opcode, input),
+                _ => return Err(Error::UnknownOpcodeError(opcode)),
+            },
+
+            0xF000 => match opcode & 0x00FF {
+                0x15 => self.set_delay_timer(opcode),
+                0x18 => self.set_sound_timer(opcode),
+                0x1E => self.load_add_i(opcode),
+                0x29 => self.find_character(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
             }
 
@@ -400,6 +408,50 @@ impl Processor {
             }
         };
         self.set_reg(register, key);
+    }
+
+    /// Opcode FX15
+    /// Set delay timer to value of VX
+    fn set_delay_timer(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        self.dt = self.get_reg(register);
+    }
+
+    /// Opcode FX18
+    /// Set sound timer to value of VX
+    fn set_sound_timer(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        self.st = self.get_reg(register);
+    }
+
+    /// Opcode FX1E
+    /// Add I to VX and store in VX (I += VX)
+    fn load_add_i(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        self.i_reg += self.get_reg(register) as u16;
+    }
+
+    /// Opcode FX29
+    /// Set I register to the address of the character in font set
+    /// corresponding to the value of VX
+    fn find_character(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        let key_value = self.get_reg(register);
+        self.i_reg = FONTSET_ADDR + 5 * key_value as u16;
+    }
+
+    /// Opcode FX33
+    /// Store binary-coded decimal conversion of number in VX to
+    /// RAM adresses I register, I + 1 and I + 2
+    fn store_bcd(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        let number = self.get_reg(register);
+        let hundreds = number / 100;
+        let tens = (number / 10) % 10;
+        let ones = number % 10;
+        self.memory.write(self.i_reg, hundreds);
+        self.memory.write(self.i_reg + 1, tens);
+        self.memory.write(self.i_reg + 2, ones);
     }
 
     // TODO Remaining opcodes

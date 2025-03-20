@@ -7,7 +7,7 @@ pub fn decode_middle_registers(opcode: u16) -> (u16, u16) {
 
 /// Get the nth bit in a byte as a boolean starting
 /// with most significant bit and zero-based indexing
- pub fn bit_to_bool(byte: u8, n: u8) -> bool {
+pub fn bit_to_bool(byte: u8, n: u8) -> bool {
     ((byte >> (7 - n)) & 0x1) != 0
 }
 
