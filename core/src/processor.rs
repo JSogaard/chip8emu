@@ -454,5 +454,17 @@ impl Processor {
         self.memory.write(self.i_reg + 2, ones);
     }
 
+    /// Opcode FX55
+    /// Dump registers from V0 to VX to RAM starting at the
+    /// address in the I register
+    fn dump_registers(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        for i in 0..=register {
+            let address = self.i_reg + i;
+            self.memory.write(address, self.get_reg(i));
+        }
+    }
+    
+
     // TODO Remaining opcodes
 }
