@@ -142,6 +142,8 @@ impl Processor {
                 0x18 => self.set_sound_timer(opcode),
                 0x1E => self.load_add_i(opcode),
                 0x29 => self.find_character(opcode),
+                0x55 => self.dump_registers_to_ram(opcode)?,
+                0x65 => self.load_registers_from_ram(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
             }
 
@@ -455,16 +457,23 @@ impl Processor {
     }
 
     /// Opcode FX55
-    /// Dump registers from V0 to VX to RAM starting at the
-    /// address in the I register
-    fn dump_registers(&mut self, opcode: u16) {
+    /// Dump registers from V0 through VX to RAM starting at the
+    /// address in I register
+    fn dump_registers_to_ram(&mut self, opcode: u16) -> Result<()> {
         let register = (opcode & 0x0F00) >> 8;
-        for i in 0..=register {
-            let address = self.i_reg + i;
-            self.memory.write(address, self.get_reg(i));
-        }
-    }
-    
+        let reg_slice = &self.v_reg[0..=register as usize];
+        self.memory.write_slice(reg_slice, self.i_reg)?;
 
-    // TODO Remaining opcodes
+        Ok(())
+    }
+
+    /// Opcode FX65
+    /// Load values from memory starting form address in I register
+    /// into V0 through VX
+    fn load_registers_from_ram(&mut self, opcode: u16) {
+        let register = (opcode & 0x0F00) >> 8;
+        let address = self.i_reg;
+        let memory_slice = self.memory.read_slice(address, register + 1);
+        self.v_reg.copy_from_slice(memory_slice);
+    }
 }

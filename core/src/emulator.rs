@@ -36,7 +36,7 @@ impl Emulator {
 
         let event_pump = sdl_context.event_pump().map_err(Error::SdlError)?;
 
-        // TODO set up beep
+        // IMPL set up beep
 
         Ok(Self {
             processor: Processor::new(&rom)?,

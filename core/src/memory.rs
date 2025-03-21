@@ -71,9 +71,23 @@ impl Memory {
     }
 
     pub fn read_slice(&self, address: u16, length: u16) -> &[u8] {
-        &self.ram[address as usize..(address + length) as usize]
+        let address = address as usize;
+        let length = length as usize;
+        &self.ram[address..address + length]
     }
 
+    pub fn write_slice(&mut self, slice: &[u8], address: u16) -> Result<()> {
+        let address = address as usize;
+        let length = slice.len();
+        // Check if memory addresses are valid
+        if address + length > self.ram.len() {
+            return Err(Error::InvalidRamAddressError);
+        }
+        self.ram[address..address + length].copy_from_slice(slice);
+
+        Ok(())
+    }
+    
     pub fn reset(&mut self) {
         self.ram = [0; RAM_SIZE];
         self.rom_loaded = false;
