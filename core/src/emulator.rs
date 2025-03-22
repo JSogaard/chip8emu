@@ -79,9 +79,9 @@ impl Emulator {
                 self.processor.cycle(&mut self.display, &mut self.input)?;
             }
 
-            self.display.render();
+            self.display.render()?;
 
-            // TODO Check sount timer and make beep
+            // IMPL Check sount timer and make beep
 
             // Frame timing
             let elapsed = frame_start.elapsed();

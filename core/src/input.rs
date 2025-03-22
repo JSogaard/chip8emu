@@ -1,5 +1,7 @@
 use sdl2::keyboard::Keycode;
 
+use crate::helpers::keycode_to_button;
+
 const KEYCODES: [Keycode; 16] = [
     Keycode::Num1,
     Keycode::Num2,
@@ -29,16 +31,22 @@ impl Input {
     }
 
     pub fn key_press(&mut self, keycode: Keycode) {
-        // TODO Key press method
+        if let Some(key_number) = keycode_to_button(keycode) {
+            self.keys[key_number] = true;
+        }
     }
 
     pub fn check_key(&self, key: u8) -> bool {
-        // TODO Check key method
-        todo!()
+        self.keys[key as usize]
     }
 
     pub fn check_all_keys(&self) -> Option<u8> {
-        // Check all keys method
-        todo!()
+        for (i, key_pressed) in self.keys.iter().enumerate() {
+            if *key_pressed {
+                return Some(i as u8);
+            }
+        }
+        // If not key is pressed
+        None
     }
 }

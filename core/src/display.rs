@@ -35,8 +35,6 @@ impl Display {
         canvas.clear();
         canvas.present();
 
-        // TODO Finish Display constructor
-
         Ok(Self {
             pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             canvas,
@@ -88,8 +86,6 @@ impl Display {
     }
 
     pub fn render(&mut self) -> Result<()> {
-        // TODO Create render method
-
         let scale_usize = self.window_scale as usize;
 
         self.canvas.set_draw_color(BACKGROUND_COLOR);
