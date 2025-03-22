@@ -26,7 +26,7 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(rom_path: &str) -> Result<Self> {
+    pub fn new(rom_path: &str, window_scale: u32) -> Result<Self> {
         let sdl_context = sdl2::init().map_err(Error::SdlError)?;
         let video_subsystem = sdl_context.video().map_err(Error::SdlError)?;
 
@@ -40,7 +40,7 @@ impl Emulator {
 
         Ok(Self {
             processor: Processor::new(&rom)?,
-            display: Display::new(video_subsystem),
+            display: Display::new(video_subsystem, window_scale)?,
             input: Input::new(),
             sdl_context,
             event_pump,

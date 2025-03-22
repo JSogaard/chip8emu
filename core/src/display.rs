@@ -1,41 +1,50 @@
-use sdl2::{render::Canvas, video::Window, VideoSubsystem};
+use sdl2::{pixels::Color, rect::Rect, render::Canvas, video::Window, VideoSubsystem};
 
-use crate::helpers::bit_to_bool;
+use crate::{errors::Error, errors::Result, helpers::bit_to_bool};
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
-const WINDOW_SCALE: u32 = 15;
-const WINDOW_WIDTH: u32 = (SCREEN_WIDTH as u32) * WINDOW_SCALE;
-const WINDOW_HEIGHT: u32 = (SCREEN_HEIGHT as u32) * WINDOW_SCALE;
+
+const BACKGROUND_COLOR: Color = Color::RGB(0, 75, 0);
+const FOREGROUND_COLOR: Color = Color::RGB(0, 255, 0);
 
 pub struct Display {
     pixels: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
     canvas: Canvas<Window>,
+    window_scale: u32,
+    window_width: u32,
+    window_height: u32,
     redraw_flag: bool,
 }
 
 impl Display {
-    pub fn new(video_subsystem: VideoSubsystem) -> Self {
+    pub fn new(video_subsystem: VideoSubsystem, window_scale: u32) -> Result<Self> {
+        let window_width = (SCREEN_WIDTH as u32) * window_scale;
+        let window_height = (SCREEN_HEIGHT as u32) * window_scale;
+
         let mut canvas = video_subsystem
-        .window("CHIP-8 Emulator", WINDOW_WIDTH, WINDOW_HEIGHT)
-        .position_centered()
-        .opengl()
-        .build()
-        .unwrap()
-        .into_canvas()
-        .build()
-        .unwrap();
+            .window("CHIP-8 Emulator", window_width, window_height)
+            .position_centered()
+            .opengl()
+            .build()
+            .map_err(|e| Error::SdlError(e.to_string()))?
+            .into_canvas()
+            .build()
+            .map_err(|e| Error::SdlError(e.to_string()))?;
 
-    canvas.clear();
-    canvas.present();
+        canvas.clear();
+        canvas.present();
 
-    // TODO Finish Display constructor
+        // TODO Finish Display constructor
 
-        Self {
+        Ok(Self {
             pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             canvas,
+            window_scale,
+            window_width,
+            window_height,
             redraw_flag: false,
-        }
+        })
     }
 
     pub fn draw(&mut self, sprite: &[u8], x_coord: u8, y_coord: u8) -> u8 {
@@ -44,7 +53,6 @@ impl Display {
         let mut carry_register: u8 = 0x0;
 
         for (k, sprite_byte) in sprite.iter().enumerate() {
-
             let y_pos = y_coord + k as u8;
             if y_pos as usize >= SCREEN_HEIGHT {
                 // If reaching bottom edge of display, break loop
@@ -79,7 +87,25 @@ impl Display {
         self.pixels = [false; SCREEN_WIDTH * SCREEN_HEIGHT];
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> Result<()> {
         // TODO Create render method
+
+        let scale_usize = self.window_scale as usize;
+
+        self.canvas.set_draw_color(BACKGROUND_COLOR);
+        self.canvas.clear();
+
+        self.canvas.set_draw_color(FOREGROUND_COLOR);
+        for (i, pixel) in self.pixels.iter().enumerate() {
+            if *pixel {
+                let x = (i % SCREEN_WIDTH * scale_usize) as i32;
+                let y = (i / SCREEN_WIDTH * scale_usize) as i32;
+                let rect = Rect::new(x, y, self.window_scale, self.window_scale);
+                self.canvas.fill_rect(rect).map_err(Error::SdlError)?;
+            }
+        }
+        self.canvas.present();
+
+        Ok(())
     }
 }
