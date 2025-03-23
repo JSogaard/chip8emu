@@ -150,7 +150,6 @@ impl Processor {
             _ => return Err(Error::UnknownOpcodeError(opcode)),
         }
 
-        // TODO Finish cycle
         Ok(())
     }
 

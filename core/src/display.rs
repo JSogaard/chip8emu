@@ -45,6 +45,10 @@ impl Display {
         })
     }
 
+    pub fn redraw_needed(&self) -> bool {
+        self.redraw_flag
+    }
+
     pub fn draw(&mut self, sprite: &[u8], x_coord: u8, y_coord: u8) -> u8 {
         self.redraw_flag = true;
 
@@ -102,6 +106,7 @@ impl Display {
         }
         self.canvas.present();
 
+        self.redraw_flag = false;
         Ok(())
     }
 }

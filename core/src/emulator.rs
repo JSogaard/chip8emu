@@ -79,7 +79,9 @@ impl Emulator {
                 self.processor.cycle(&mut self.display, &mut self.input)?;
             }
 
-            self.display.render()?;
+            if self.display.redraw_needed() {
+                self.display.render()?;
+            }
 
             // IMPL Check sount timer and make beep
 
