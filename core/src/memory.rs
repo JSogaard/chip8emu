@@ -49,7 +49,7 @@ impl Memory {
 
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<()> {
         if rom.len() <= MAX_ROM_SIZE {
-            self.ram[START_ADDR as usize..].copy_from_slice(rom);
+            self.ram[START_ADDR as usize..START_ADDR as usize + rom.len()].copy_from_slice(rom);
         } else {
             return Err(Error::InvalidRomSizeError);
         }
