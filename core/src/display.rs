@@ -26,6 +26,7 @@ impl Display {
             .window("CHIP-8 Emulator", window_width, window_height)
             .position_centered()
             .opengl()
+            .resizable()
             .build()
             .map_err(|e| Error::SdlError(e.to_string()))?
             .into_canvas()
