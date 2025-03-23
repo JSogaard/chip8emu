@@ -5,7 +5,7 @@ use crate::{errors::Error, errors::Result, helpers::bit_to_bool};
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
-const BACKGROUND_COLOR: Color = Color::RGB(0, 75, 0);
+const BACKGROUND_COLOR: Color = Color::RGB(0, 15, 0);
 const FOREGROUND_COLOR: Color = Color::RGB(0, 255, 0);
 
 pub struct Display {
