@@ -39,7 +39,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["roms/PONG2"],
+            "args": ["roms/PONG"],
             "cwd": "${workspaceFolder}"
         },
         {

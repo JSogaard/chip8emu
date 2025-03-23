@@ -195,6 +195,7 @@ impl Processor {
     /// Call subroutine at address NNN
     fn call_subroutine(&mut self, opcode: u16) -> Result<()> {
         // PC is pushed to stack to remember where to return after subroutine
+        //FIXME Fix call subroutine - ends up wrong place
         self.stack.push(self.pc)?;
         let address = opcode & 0x0FFF;
         self.pc = address;
