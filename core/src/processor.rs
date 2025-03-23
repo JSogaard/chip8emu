@@ -84,6 +84,8 @@ impl Processor {
         let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
 
+        println!("{opcode:x}");
+
         // DECODE AND EXECUTE OPCODE
         // Filter op code to match only the first half byte
         match opcode & 0xF000 {
@@ -138,10 +140,13 @@ impl Processor {
             },
 
             0xF000 => match opcode & 0x00FF {
+                0x07 => self.load_delay_timer(opcode),
+                0x0A => self.wait_for_keypress(opcode, input),
                 0x15 => self.set_delay_timer(opcode),
                 0x18 => self.set_sound_timer(opcode),
                 0x1E => self.load_add_i(opcode),
                 0x29 => self.find_character(opcode),
+                0x33 => self.store_bcd(opcode),
                 0x55 => self.dump_registers_to_ram(opcode)?,
                 0x65 => self.load_registers_from_ram(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
@@ -474,6 +479,6 @@ impl Processor {
         let register = (opcode & 0x0F00) >> 8;
         let address = self.i_reg;
         let memory_slice = self.memory.read_slice(address, register + 1);
-        self.v_reg.copy_from_slice(memory_slice);
+        self.v_reg[..=register as usize].copy_from_slice(memory_slice);
     }
 }

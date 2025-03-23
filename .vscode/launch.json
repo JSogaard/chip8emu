@@ -39,7 +39,8 @@
                     "kind": "bin"
                 }
             },
-            "args": ["roms/PONG"],
+            // "args": ["roms/PONG"],
+            "args": ["../chip8-test-suite/bin/6-keypad.ch8"],
             "cwd": "${workspaceFolder}"
         },
         {

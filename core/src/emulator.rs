@@ -1,6 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode, EventPump, Sdl};
 use std::{
-    fs::File,
+    fs::{self, File},
     io::Read,
     thread::sleep,
     time::{Duration, Instant},
@@ -30,9 +30,10 @@ impl Emulator {
         let sdl_context = sdl2::init().map_err(Error::SdlError)?;
         let video_subsystem = sdl_context.video().map_err(Error::SdlError)?;
 
-        let mut rom_file = File::open(rom_path)?;
-        let mut rom = Vec::new();
-        rom_file.read_to_end(&mut rom)?;
+        // let mut rom_file = File::open(rom_path)?;
+        // let mut rom = Vec::new();
+        let rom: Vec<u8> = fs::read(rom_path)?;
+        // rom_file.read_to_end(&mut rom)?;
 
         let event_pump = sdl_context.event_pump().map_err(Error::SdlError)?;
 
