@@ -120,7 +120,7 @@ impl Processor {
                 0x4 => self.add_register_carry(opcode),
                 0x5 => self.sub_register(opcode),
                 0x6 => self.shift_right(opcode),
-                0x7 => self.sub_register(opcode),
+                0x7 => self.sub_register_reversed(opcode),
                 0xE => self.shift_left(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
             },
@@ -265,10 +265,11 @@ impl Processor {
     fn add_register_carry(&mut self, opcode: u16) {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
         let result = self.get_reg(reg_x).wrapping_add(self.get_reg(reg_y));
+        let carry = (result < self.get_reg(reg_x)) as u8;
         self.set_reg(reg_x, result);
 
         // Enable carry register if addition overflows
-        self.set_carry((result < self.get_reg(reg_x)) as u8);
+        self.set_carry(carry);
     }
 
     /// Opcode 8XY5
@@ -278,20 +279,24 @@ impl Processor {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
 
         // Enable carry register if subtraction borrows
-        let not_borrow = (self.get_reg(reg_x) > self.get_reg(reg_y)) as u8;
-        self.set_carry(not_borrow);
+        let not_borrow = (self.get_reg(reg_x) >= self.get_reg(reg_y)) as u8;
 
         let result = self.get_reg(reg_x).wrapping_sub(self.get_reg(reg_y));
         self.set_reg(reg_x, result);
+        
+        self.set_carry(not_borrow);
     }
 
     /// Opcode 8XY6
     /// Set carry register to least significant bit of VX
     /// and shift VX one bit right
     fn shift_right(&mut self, opcode: u16) {
-        let register = (opcode & 0x0F00) >> 8;
-        self.set_carry(self.get_reg(register) & 0x1);
-        self.set_reg(register, self.get_reg(register) >> 1);
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+        // Quirk set VX to value of VY
+        self.set_reg(reg_x, self.get_reg(reg_y));
+        let carry = self.get_reg(reg_x) & 0x1;
+        self.set_reg(reg_x, self.get_reg(reg_x) >> 1);
+        self.set_carry(carry);
     }
 
     /// Opcode 8XY7
@@ -301,20 +306,24 @@ impl Processor {
         let (reg_x, reg_y) = decode_middle_registers(opcode);
 
         // Enable carry register if subtraction borrows
-        let not_borrow = (self.get_reg(reg_y) > self.get_reg(reg_x)) as u8;
-        self.set_carry(not_borrow);
-
+        let not_borrow = (self.get_reg(reg_y) >= self.get_reg(reg_x)) as u8;
+        
         let result = self.get_reg(reg_y).wrapping_sub(self.get_reg(reg_x));
         self.set_reg(reg_x, result);
+        
+        self.set_carry(not_borrow);
     }
 
     /// Opcode 8XYE
-    /// Set carry register to least significant bit of VX
+    /// Set carry register to most significant bit of VX
     /// and shift VX one bit left
     fn shift_left(&mut self, opcode: u16) {
-        let register = ((opcode & 0x0F00) >> 8) as usize;
-        self.set_carry(self.v_reg[register] & 0x1);
-        self.v_reg[register] <<= 1;
+        let (reg_x, reg_y) = decode_middle_registers(opcode);
+        // Quirk set VX to value of VY
+        self.set_reg(reg_x, self.get_reg(reg_y));
+        let carry = (self.get_reg(reg_x) & 0x80) >> 7;
+        self.set_reg(reg_x, self.get_reg(reg_x) << 1);
+        self.set_carry(carry);
     }
 
     /// Opcode 9XY0

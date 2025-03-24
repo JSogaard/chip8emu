@@ -39,8 +39,8 @@
                     "kind": "bin"
                 }
             },
-            // "args": ["roms/BLINKY"],
-            "args": ["../chip8-test-suite/bin/6-keypad.ch8"],
+            // "args": ["roms/INVADERS"],
+            "args": ["../chip8-test-suite/bin/4-flags.ch8"],
             "cwd": "${workspaceFolder}"
         },
         {
