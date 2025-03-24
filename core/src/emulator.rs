@@ -1,7 +1,6 @@
 use sdl2::{event::Event, keyboard::Keycode, EventPump, Sdl};
 use std::{
-    fs::{self, File},
-    io::Read,
+    fs,
     thread::sleep,
     time::{Duration, Instant},
 };
