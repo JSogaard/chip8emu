@@ -84,8 +84,6 @@ impl Processor {
         let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
 
-        println!("{opcode:x}");
-
         // DECODE AND EXECUTE OPCODE
         // Filter op code to match only the first half byte
         match opcode & 0xF000 {
@@ -376,7 +374,7 @@ impl Processor {
 
     /// Opcode EX9E
     /// Skip next instruction if key VX is pressed down. Do not wait for input
-    fn skip_if_keypress(&mut self, opcode: u16, input: &Input) {
+    fn skip_if_keypress(&mut self, opcode: u16, input: &mut Input) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if input.check_key(key) {
@@ -386,7 +384,7 @@ impl Processor {
 
     /// Opcode EXA1
     /// Skip next instruction if key VX is *not* pressed down. Do not wait for input
-    fn skip_if_not_keypress(&mut self, opcode: u16, input: &Input) {
+    fn skip_if_not_keypress(&mut self, opcode: u16, input: &mut Input) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if !input.check_key(key) {
@@ -405,7 +403,7 @@ impl Processor {
     /// Opcode FX0A
     /// Wait for key press and store key value in VX. If no key is pressed
     /// the PC is decremented to rerun opcode
-    fn wait_for_keypress(&mut self, opcode: u16, input: &Input) {
+    fn wait_for_keypress(&mut self, opcode: u16, input: &mut Input) {
         let register = (opcode & 0x0F00) >> 8;
         let key = match input.check_all_keys() {
             Some(key) => key,

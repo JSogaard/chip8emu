@@ -2,25 +2,6 @@ use sdl2::keyboard::Keycode;
 
 use crate::helpers::keycode_to_button;
 
-const KEYCODES: [Keycode; 16] = [
-    Keycode::Num1,
-    Keycode::Num2,
-    Keycode::Num3,
-    Keycode::Num4,
-    Keycode::Q,
-    Keycode::W,
-    Keycode::E,
-    Keycode::R,
-    Keycode::A,
-    Keycode::S,
-    Keycode::D,
-    Keycode::F,
-    Keycode::Z,
-    Keycode::X,
-    Keycode::C,
-    Keycode::V,
-];
-
 pub struct Input {
     keys: [bool; 16],
 }
@@ -36,17 +17,24 @@ impl Input {
         }
     }
 
-    pub fn check_key(&self, key: u8) -> bool {
-        self.keys[key as usize]
+    pub fn check_key(&mut self, key_number: u8) -> bool {
+        let key = self.keys[key_number as usize];
+        self.keys[key_number as usize] = false;
+        key
     }
 
-    pub fn check_all_keys(&self) -> Option<u8> {
+    pub fn check_all_keys(&mut self) -> Option<u8> {
         for (i, key_pressed) in self.keys.iter().enumerate() {
             if *key_pressed {
+                self.reset();
                 return Some(i as u8);
             }
         }
         // If not key is pressed
         None
+    }
+
+    fn reset(&mut self) {
+        self.keys = [false; 16];
     }
 }
