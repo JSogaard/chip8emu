@@ -8,7 +8,7 @@ const DEFAULT_SCALE: u32 = 20;
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let rom_path = cli.rom_path;
-    let window_scale = cli.window_scale.unwrap_or(DEFAULT_SCALE);
+    let window_scale = cli.window_scale;
 
     let mut emulator = Emulator::new(&rom_path, window_scale)?;
     emulator.run()?;
@@ -19,6 +19,6 @@ fn main() -> Result<()> {
 #[derive(Parser)]
 struct Cli {
     rom_path: String,
-    #[arg(short, long)]
-    window_scale: Option<u32>,
+    #[arg(short, long, default_value_t = DEFAULT_SCALE)]
+    window_scale: u32,
 }
