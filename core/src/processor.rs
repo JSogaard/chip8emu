@@ -1,3 +1,4 @@
+use log::debug;
 use rand::Rng;
 
 use crate::display::{Display, SCREEN_HEIGHT, SCREEN_WIDTH};
@@ -29,6 +30,8 @@ pub struct Processor {
 
 impl Processor {
     pub fn new(rom: &[u8]) -> Result<Self> {
+        env_logger::init();
+
         let mut memory = Memory::new();
         memory.load_rom(rom)?;
 
@@ -83,6 +86,8 @@ impl Processor {
         let low_byte = self.memory.read(self.pc + 1) as u16;
         let opcode = (high_byte << 8) | low_byte;
         self.pc += 2;
+
+        debug!("PC: {:x}, Opcode: 0x{:x}", self.pc - 2, opcode);
 
         // DECODE AND EXECUTE OPCODE
         // Filter op code to match only the first half byte

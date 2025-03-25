@@ -17,6 +17,8 @@ fn main() -> Result<()> {
 }
 
 #[derive(Parser)]
+#[command(version)]
+/// A CHIP-8 emulator/interpreter implemented in Rust.
 struct Cli {
     rom_path: String,
     #[arg(short, long, default_value_t = DEFAULT_SCALE)]
