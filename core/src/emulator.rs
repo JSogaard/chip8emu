@@ -83,6 +83,8 @@ impl Emulator {
                 self.display.render()?;
             }
 
+            self.processor.tick_timers();
+
             // IMPL Check sount timer and make beep
 
             // Frame timing
