@@ -3,4 +3,4 @@ resolver = "2"
 members = [
     "core",
     "cli"
-]
+, "disassembler"]
