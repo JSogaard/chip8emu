@@ -1,1 +1,2 @@
 mod disassembler;
+mod errors;

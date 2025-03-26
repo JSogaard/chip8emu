@@ -173,9 +173,7 @@ impl Processor {
         self.v_reg[register as usize]
     }
 
-    //************************************************************//
-    //                      OPCODE METHODS                        //
-    //************************************************************//
+    /***** OPCODE METHODS *****/
 
     /// Opcode 00E0
     /// Clear screen
