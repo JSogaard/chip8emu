@@ -1,4 +1,3 @@
-use std::fs::File;
 use crate::errors::Error;
 
 fn disassembler(rom_path: &str) -> Result<(), Error> {
@@ -21,30 +20,29 @@ fn disassembler(rom_path: &str) -> Result<(), Error> {
             0x3000 => skip_equal(address, opcode),
             0x4000 => skip_not_equal(address, opcode),
             0x5000 => skip_register_equal(address, opcode),
-            0x6000 => load_number(opcode),
-            0x7000 => add_number(opcode),
+            0x6000 => load_number(address, opcode),
+            0x7000 => add_number(address, opcode),
 
             // Register loading opcodes
             0x8000 => match opcode & 0x000F {
-                // Simple load instruction
-                0x0 => load_register_op(opcode, |_, vy| vy),
+                0x0 => move_register(address, opcode),
                 // OR
-                0x1 => load_register_op(opcode, |vx, vy| vx | vy),
+                0x1 => load_register_op(address, opcode, "OR"),
                 // AND
-                0x2 => load_register_op(opcode, |vx, vy| vx & vy),
+                0x2 => load_register_op(address, opcode, "AND"),
                 // XOR
-                0x3 => load_register_op(opcode, |vx, vy| vx ^ vy),
-                0x4 => add_register_carry(opcode),
-                0x5 => sub_register(opcode),
-                0x6 => shift_right(opcode),
-                0x7 => sub_register_reversed(opcode),
-                0xE => shift_left(opcode),
+                0x3 => load_register_op(address, opcode, "XOR"),
+                0x4 => add_register_carry(address, opcode),
+                0x5 => sub_register(address, opcode),
+                0x6 => shift_right(address, opcode),
+                0x7 => sub_register_reversed(address, opcode),
+                0xE => shift_left(address, opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
             },
 
-            0x9000 => skip_register_not_equal(opcode),
-            0xA000 => load_i(opcode),
-            0xB000 => jump_plus(opcode),
+            0x9000 => skip_register_not_equal(address, opcode),
+            0xA000 => load_i(address, opcode),
+            0xB000 => jump_plus(address, opcode),
             0xC000 => random_and(opcode),
             0xD000 => draw_sprite(opcode, display),
 
@@ -62,7 +60,7 @@ fn disassembler(rom_path: &str) -> Result<(), Error> {
                 0x1E => load_add_i(opcode),
                 0x29 => find_character(opcode),
                 0x33 => store_bcd(opcode),
-                0x55 => dump_registers_to_ram(opcode?,
+                0x55 => dump_registers_to_ram(opcode)
                 0x65 => load_registers_from_ram(opcode),
                 _ => return Err(Error::UnknownOpcodeError(opcode)),
             }
@@ -115,19 +113,89 @@ fn call_subroutine(address: u32, opcode: u32) -> String {
 }
 
 fn skip_equal(address: u32, opcode: u32) -> String {
-    let register = (opcode & 0x0F00) >> 8;
+    let reg = (opcode & 0x0F00) >> 8;
     let number = opcode & 0x00FF;
-    opcode_reg_arg(address, "SKE", register, number)
+    opcode_reg_arg(address, "SKE", reg, number)
 }
 
 fn skip_not_equal(address: u32, opcode: u32) -> String {
-    let register = (opcode & 0x0F00) >> 8;
+    let reg = (opcode & 0x0F00) >> 8;
     let number = opcode & 0x00FF;
-    opcode_reg_arg(address, "SKNE", register, number)
+    opcode_reg_arg(address, "SKNE", reg, number)
 }
 
 fn skip_register_equal(address: u32, opcode: u32) -> String {
     let reg_x = (opcode & 0x0F00) >> 8;
     let reg_y = (opcode & 0x00F0) >> 4;
     opcode_reg_arg(address, "SKRE", reg_x, reg_y)
+}
+
+fn load_number(address: u32, opcode: u32) -> String {
+    let reg = (opcode & 0x0F00) >> 8;
+    let number = opcode & 0x00FF;
+    opcode_reg_arg(address, "LOAD", reg, number)
+}
+
+fn add_number(address: u32, opcode: u32) -> String {
+    let reg = (opcode & 0x0F00) >> 8;
+    let number = opcode & 0x00FF;
+    opcode_reg_arg(address, "ADD", reg, number)
+}
+
+fn move_register(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "MOVE", reg_x, reg_y)
+}
+
+fn load_register_op(address: u32, opcode: u32, operation: &str) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, operation, reg_x, reg_y)
+}
+
+fn add_register_carry(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "ADDR", reg_x, reg_y)
+}
+
+fn sub_register(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "SUB", reg_x, reg_y)
+}
+
+fn shift_right(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "SHR", reg_x, reg_y)
+}
+
+fn sub_register_reversed(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "SUBR", reg_x, reg_y)
+}
+
+fn shift_left(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "SHL", reg_x, reg_y)
+}
+
+fn skip_register_not_equal(address: u32, opcode: u32) -> String {
+    let reg_x = (opcode & 0x0F00) >> 8;
+    let reg_y = (opcode & 0x00F0) >> 4;
+    opcode_reg_reg(address, "SKRNE", reg_x, reg_y)
+}
+
+fn load_i(address: u32, opcode: u32) -> String {
+    let number = opcode & 0x0FFF;
+    opcode_one_arg(address, "LOADI", number)
+}
+
+fn jump_plus(address: u32, opcode: u32) -> String {
+    let number = opcode & 0x0FFF;
+    opcode_one_arg(number, "JUMPI", address)
 }

@@ -39,7 +39,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["roms/BLINKY"],
+            "args": ["../roms/BLINKY"],
             // "args": ["../chip8-test-suite/bin/5-quirks.ch8"],
             "cwd": "${workspaceFolder}"
         },
