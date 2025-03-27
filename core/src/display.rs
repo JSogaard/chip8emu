@@ -12,8 +12,6 @@ pub struct Display {
     pixels: [bool; SCREEN_WIDTH * SCREEN_HEIGHT],
     canvas: Canvas<Window>,
     window_scale: u32,
-    window_width: u32,
-    window_height: u32,
     redraw_flag: bool,
 }
 
@@ -40,8 +38,6 @@ impl Display {
             pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             canvas,
             window_scale,
-            window_width,
-            window_height,
             redraw_flag: false,
         })
     }

@@ -143,7 +143,7 @@ impl Processor {
             },
 
             0xF000 => match opcode & 0x00FF {
-                0x07 => self.load_delay_timer(opcode),
+                0x07 => self.move_delay_timer(opcode),
                 0x0A => self.wait_for_keypress(opcode, input),
                 0x15 => self.set_delay_timer(opcode),
                 0x18 => self.set_sound_timer(opcode),
@@ -174,12 +174,6 @@ impl Processor {
     }
 
     /***** OPCODE METHODS *****/
-
-    /// Opcode 00E0
-    /// Clear screen
-    fn clear_display(&mut self, display: &mut Display) {
-        display.clear();
-    }
 
     /// Opcode 00EE
     /// Return from subroutine
@@ -405,7 +399,7 @@ impl Processor {
 
     /// Opcode FX07
     /// Load value of delay timer into VX
-    fn load_delay_timer(&mut self, opcode: u16) {
+    fn move_delay_timer(&mut self, opcode: u16) {
         let register = (opcode & 0x0F00) >> 8;
         let value = self.dt;
         self.set_reg(register, value);

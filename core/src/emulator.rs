@@ -20,7 +20,7 @@ pub struct Emulator {
     processor: Processor,
     display: Display,
     input: Input,
-    sdl_context: Sdl,
+    _sdl_context: Sdl,
     event_pump: EventPump,
 }
 
@@ -39,7 +39,7 @@ impl Emulator {
             processor: Processor::new(&rom)?,
             display: Display::new(video_subsystem, window_scale)?,
             input: Input::new(),
-            sdl_context,
+            _sdl_context: sdl_context,
             event_pump,
         })
     }
