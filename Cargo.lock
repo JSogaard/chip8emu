@@ -141,6 +141,7 @@ dependencies = [
  "anyhow",
  "clap",
  "core",
+ "disassembler",
 ]
 
 [[package]]

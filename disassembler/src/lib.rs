@@ -1,2 +1,2 @@
-mod disassembler;
-mod errors;
+pub mod disassembler;
+pub mod errors;
