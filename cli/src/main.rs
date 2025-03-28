@@ -13,7 +13,7 @@ fn main() -> Result<()> {
             rom_path,
             window_scale,
         } => {
-            let mut emulator = Emulator::new(&rom_path, window_scale)?;
+            let mut emulator = Emulator::try_new(&rom_path, window_scale)?;
             emulator.run()?;
         },
         Commands::Disassemble { rom_path, output } => {

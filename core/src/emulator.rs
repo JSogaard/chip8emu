@@ -6,10 +6,7 @@ use std::{
 };
 
 use crate::{
-    display::Display,
-    errors::{Error, Result},
-    input::Input,
-    processor::Processor,
+    audio_output::AudioOutput, display::Display, errors::{Error, Result}, key_input::KeyInput, processor::Processor
 };
 
 const FRAME_RATE: u32 = 60;
@@ -19,13 +16,14 @@ const CYCLES_PER_FRAME: u32 = CLOCK_SPEED / FRAME_RATE + 1;
 pub struct Emulator {
     processor: Processor,
     display: Display,
-    input: Input,
+    input: KeyInput,
+    audio: AudioOutput,
     _sdl_context: Sdl,
     event_pump: EventPump,
 }
 
 impl Emulator {
-    pub fn new(rom_path: &str, window_scale: u32) -> Result<Self> {
+    pub fn try_new(rom_path: &str, window_scale: u32) -> Result<Self> {
         let sdl_context = sdl2::init().map_err(Error::SdlError)?;
         let video_subsystem = sdl_context.video().map_err(Error::SdlError)?;
 
@@ -33,12 +31,11 @@ impl Emulator {
 
         let event_pump = sdl_context.event_pump().map_err(Error::SdlError)?;
 
-        // IMPL set up beep
-
         Ok(Self {
-            processor: Processor::new(&rom)?,
-            display: Display::new(video_subsystem, window_scale)?,
-            input: Input::new(),
+            processor: Processor::try_new(&rom)?,
+            display: Display::try_new(video_subsystem, window_scale)?,
+            input: KeyInput::new(),
+            audio: AudioOutput::try_new()?,
             _sdl_context: sdl_context,
             event_pump,
         })
@@ -84,7 +81,11 @@ impl Emulator {
 
             self.processor.tick_timers();
 
-            // IMPL Check sount timer and make beep
+            if self.processor.check_beep() {
+                self.audio.start()
+            } else {
+                self.audio.stop();
+            }
 
             // Frame timing
             let elapsed = frame_start.elapsed();

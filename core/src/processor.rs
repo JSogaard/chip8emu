@@ -4,7 +4,7 @@ use rand::Rng;
 use crate::display::{Display, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::errors::{Error, Result};
 use crate::helpers::decode_middle_registers;
-use crate::input::Input;
+use crate::key_input::KeyInput;
 use crate::memory::{Memory, FONTSET_ADDR, RAM_SIZE, START_ADDR};
 use crate::stack::Stack;
 
@@ -29,7 +29,7 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub fn new(rom: &[u8]) -> Result<Self> {
+    pub fn try_new(rom: &[u8]) -> Result<Self> {
         env_logger::init();
 
         let mut memory = Memory::new();
@@ -70,7 +70,7 @@ impl Processor {
         self.st > 0
     }
 
-    pub fn cycle(&mut self, display: &mut Display, input: &mut Input) -> Result<()> {
+    pub fn cycle(&mut self, display: &mut Display, input: &mut KeyInput) -> Result<()> {
         // Check if ROM as been loaded into RAM
         if !self.memory.rom_loaded() {
             return Err(Error::MissingRomError);
@@ -379,7 +379,7 @@ impl Processor {
 
     /// Opcode EX9E
     /// Skip next instruction if key VX is pressed down. Do not wait for input
-    fn skip_if_keypress(&mut self, opcode: u16, input: &mut Input) {
+    fn skip_if_keypress(&mut self, opcode: u16, input: &mut KeyInput) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if input.check_key(key) {
@@ -389,7 +389,7 @@ impl Processor {
 
     /// Opcode EXA1
     /// Skip next instruction if key VX is *not* pressed down. Do not wait for input
-    fn skip_if_not_keypress(&mut self, opcode: u16, input: &mut Input) {
+    fn skip_if_not_keypress(&mut self, opcode: u16, input: &mut KeyInput) {
         let register = (opcode & 0x0F00) >> 8;
         let key = self.get_reg(register);
         if !input.check_key(key) {
@@ -408,7 +408,7 @@ impl Processor {
     /// Opcode FX0A
     /// Wait for key press and store key value in VX. If no key is pressed
     /// the PC is decremented to rerun opcode
-    fn wait_for_keypress(&mut self, opcode: u16, input: &mut Input) {
+    fn wait_for_keypress(&mut self, opcode: u16, input: &mut KeyInput) {
         let register = (opcode & 0x0F00) >> 8;
         let key = match input.check_all_keys() {
             Some(key) => key,

@@ -16,7 +16,7 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn new(video_subsystem: VideoSubsystem, window_scale: u32) -> Result<Self> {
+    pub fn try_new(video_subsystem: VideoSubsystem, window_scale: u32) -> Result<Self> {
         let window_width = (SCREEN_WIDTH as u32) * window_scale;
         let window_height = (SCREEN_HEIGHT as u32) * window_scale;
 

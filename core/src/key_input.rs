@@ -2,11 +2,11 @@ use sdl2::keyboard::Keycode;
 
 use crate::helpers::keycode_to_button;
 
-pub struct Input {
+pub struct KeyInput {
     keys: [bool; 16],
 }
 
-impl Input {
+impl KeyInput {
     pub fn new() -> Self {
         Self { keys: [false; 16] }
     }

@@ -27,9 +27,10 @@ pub enum Error {
     SdlError(String),
 
     #[error("Failed to read ROM file")]
-    RomFileReadError(#[from] std::io::Error)
+    RomFileReadError(#[from] std::io::Error),
 
-
+    #[error("Audio output failed:\n{0}")]
+    AudioOutputError(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
