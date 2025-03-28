@@ -69,7 +69,11 @@ pub fn disassembler(rom_path: &str, output: Option<String>) -> Result<(), Error>
 
             _ => return Err(Error::UnknownOpcodeError(opcode)),
         };
+        
+        // println!("{opcode:04X},   {:03X}       {line}", i * 2);
+        
         assembly.push(line);
+
     }
 
     let assembly = assembly.join("\n");
@@ -87,27 +91,27 @@ pub fn disassembler(rom_path: &str, output: Option<String>) -> Result<(), Error>
 }
 
 fn format_no_arg(address: u32, mnemonic: &str) -> String {
-    format!("{address:03X}: {mnemonic}")
+    format!("{address:03X}: {mnemonic:<6}")
 }
 
 fn format_one_arg(address: u32, mnemonic: &str, arg: u32) -> String {
-    format!("{address:03X}: {mnemonic} {arg:#X}")
+    format!("{address:03X}: {mnemonic:<6} {arg:#X}")
 }
 
 fn format_one_reg(address: u32, mnemonic: &str, reg: u32) -> String {
-    format!("{address:03X}: {mnemonic} V{reg:X}")
+    format!("{address:03X}: {mnemonic:<6} V{reg:X}")
 }
 
 fn format_reg_arg(address: u32, mnemonic: &str, reg: u32, arg: u32) -> String {
-    format!("{address:03X}: {mnemonic} V{reg:X}, {arg:#X}")
+    format!("{address:03X}: {mnemonic:<6} V{reg:X}, {arg:#X}")
 }
 
 fn format_reg_reg(address: u32, mnemonic: &str, reg1: u32, reg2: u32) -> String {
-    format!("{address:03X}: {mnemonic} V{reg1:X}, V{reg2:X}")
+    format!("{address:03X}: {mnemonic:<6} V{reg1:X}, V{reg2:X}")
 }
 
 fn format_reg_reg_arg(address: u32, mnemonic: &str, reg1: u32, reg2: u32, arg: u32) -> String {
-    format!("{address:03X}: {mnemonic} V{reg1:X}, V{reg2:X}, {arg:#X}")
+    format!("{address:03X}: {mnemonic:<6} V{reg1:X}, V{reg2:X}, {arg:#X}")
 }
 
 fn get_hex_digit(hex: u32, i: u32) -> u32 {

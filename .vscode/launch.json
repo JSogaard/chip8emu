@@ -40,7 +40,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["disassemble", "../roms/BLINKY"],
+            "args": ["disassemble", "../roms/TETRIS"],
             "cwd": "${workspaceFolder}"
         },
         {
