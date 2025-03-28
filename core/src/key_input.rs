@@ -24,9 +24,7 @@ impl KeyInput {
     }
 
     pub fn check_key(&mut self, key_number: u8) -> bool {
-        let key = self.keys[key_number as usize];
-        // self.keys[key_number as usize] = false;
-        key
+        self.keys[key_number as usize]
     }
 
     pub fn check_all_keys(&mut self) -> Option<u8> {
