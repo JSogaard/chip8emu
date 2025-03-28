@@ -17,9 +17,15 @@ impl Input {
         }
     }
 
+    pub fn key_release(&mut self, keycode: Keycode) {
+        if let Some(key_number) = keycode_to_button(keycode) {
+            self.keys[key_number] = false;
+        }
+    }
+
     pub fn check_key(&mut self, key_number: u8) -> bool {
         let key = self.keys[key_number as usize];
-        self.keys[key_number as usize] = false;
+        // self.keys[key_number as usize] = false;
         key
     }
 
@@ -34,7 +40,7 @@ impl Input {
         None
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.keys = [false; 16];
     }
 }

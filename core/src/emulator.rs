@@ -58,14 +58,16 @@ impl Emulator {
                         ..
                     } => {
                         break 'main_loop;
-                    }
+                    },
 
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
                     } => {
                         self.input.key_press(keycode);
-                    }
+                    },
+
+                    Event::KeyUp {keycode: Some(keycode), .. } => self.input.key_release(keycode),
 
                     _ => {}
                 }
