@@ -35,7 +35,7 @@ impl Stack {
         if self.sp == 0 {
             return Err(Error::StackUnderflowError);
         }
-
+        
         self.sp -= 1;
         Ok(self.stack[self.sp as usize])
     }
